@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebas
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 // Grab the config defined in the HTML
-const firebaseConfig = window.firebaseConfig;
+const firebaseConfig = JSON.parse(document.getElementById('firebase-config').textContent);
 
 if (!firebaseConfig) {
     console.error("Firebase configuration missing!");
