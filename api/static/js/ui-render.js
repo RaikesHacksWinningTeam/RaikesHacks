@@ -7,7 +7,8 @@ const SIDEBAR_WIDTH = 180;
 const GAP = 12;
 const PADDING = 20;
 
-export function getOrgColor(name) {
+export function getOrgColor(name, storedColor) {
+    if (storedColor) return storedColor;
     let hash = 0;
     for (let c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash);
     return ORG_COLORS[Math.abs(hash) % ORG_COLORS.length];
@@ -82,7 +83,7 @@ export function renderDashboard(state) {
         grid-template-columns: ${SIDEBAR_WIDTH}px 1fr;
         gap: ${GAP}px;
         padding: ${PADDING}px;
-        background: #f8fafc;
+        background: var(--surface);
         position: relative;
         overflow-y: auto;
     `;
@@ -164,10 +165,10 @@ export function renderDashboard(state) {
         position: sticky;
         top: 0;
         z-index: 110;
-        background: rgba(248, 250, 252, 0.95);
+        background: var(--background);
         backdrop-filter: blur(4px);
         padding-bottom: 10px;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid var(--border);
     `;
     // Time header (16 segments for 6 AM to 10 PM)
     for (let i = 0; i < 16; i++) {
@@ -194,18 +195,25 @@ export function renderDashboard(state) {
 
         // Sidebar label
         const orgLabel = document.createElement('div');
+        const orgColorValue = getOrgColor(org.name || org.id, org.color);
         orgLabel.style.cssText = `
             font-weight: 800;
-            color: #1e293b;
+            color: var(--text-dark);
             display: flex;
             align-items: center;
+            gap: 12px;
             padding: 15px;
             font-size: 0.95rem;
             z-index: 2;
-            border-bottom: 1px solid #e2e8f0;
-            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
         `;
-        orgLabel.innerText = org.name;
+        
+        const initial = (org.name || '?')[0].toUpperCase();
+        orgLabel.innerHTML = `
+            <div style="width: 28px; height: 28px; border-radius: 6px; background: ${orgColorValue}; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; flex-shrink: 0;">${initial}</div>
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${org.name}</span>
+        `;
         container.appendChild(orgLabel);
 
         // Timeline slot with admin styling
@@ -214,7 +222,7 @@ export function renderDashboard(state) {
             position: relative;
             min-height: ${EVENT_HEIGHT + 5}px;
             z-index: 5;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--border);
             ${hasAccess ? `
                 background: linear-gradient(90deg, rgba(99,91,255,0.03) 0%, transparent 100%);
             ` : ''}
@@ -258,7 +266,7 @@ export function renderDashboard(state) {
 
             const eventEl = document.createElement('div');
             eventEl.classList.add('event-card');
-            const baseColor = getOrgColor(org.name);
+            const baseColor = getOrgColor(org.name, org.color);
 
             eventEl.style.cssText = `
                 position: absolute;
@@ -345,7 +353,7 @@ export function renderMyOrgsPanel(userOrgs) {
 
     container.innerHTML = userOrgs.map(org => {
         const initial = (org.name || '?')[0].toUpperCase();
-        const color = getOrgColor(org.name || org.id);
+        const color = getOrgColor(org.name || org.id, org.color);
         const role = org.role || 'viewer';
         const canManage = ['owner', 'admin'].includes(role);
         const isOwner = role === 'owner';

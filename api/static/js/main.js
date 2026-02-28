@@ -60,13 +60,22 @@ window.toggleOrgCard = async (orgId) => {
     const panel = document.getElementById(`org-member-panel-${orgId}`);
     if (!card || !panel) return;
 
-    const isOpen = panel.style.display === 'block';
-    document.querySelectorAll('.org-member-panel').forEach(p => p.style.display = 'none');
-    document.querySelectorAll('.org-card-expand-icon').forEach(i => i.style.transform = 'rotate(0deg)');
+    const isOpen = card.classList.contains('open');
+    
+    // Close all other cards first
+    document.querySelectorAll('.org-card-expandable.open').forEach(otherCard => {
+        if (otherCard.id !== `org-card-${orgId}`) {
+            otherCard.classList.remove('open');
+            const otherPanel = otherCard.querySelector('.org-member-panel');
+            if (otherPanel) otherPanel.style.display = 'none';
+        }
+    });
 
     if (!isOpen) {
+        card.classList.add('open');
         panel.style.display = 'block';
-        card.querySelector('.org-card-expand-icon').style.transform = 'rotate(180deg)';
+        
+        const listContainer = document.getElementById(`member-list-${orgId}`);
         if (!_memberCache[orgId]) {
             const res = await fetchOrgMembersAPI(orgId);
             if (res.ok) {
@@ -74,7 +83,10 @@ window.toggleOrgCard = async (orgId) => {
                 _memberCache[orgId] = data.members;
             }
         }
-        buildMemberPanel(orgId, panel, _memberCache[orgId] || [], state.userOrgs);
+        buildMemberPanel(orgId, listContainer, _memberCache[orgId] || [], state.userOrgs);
+    } else {
+        card.classList.remove('open');
+        panel.style.display = 'none';
     }
 };
 
@@ -83,11 +95,12 @@ window.setMemberRole = async (orgId, uid, role) => {
         const res = await setMemberRoleAPI(orgId, uid, role);
         if (res.ok) {
             _memberCache[orgId] = null; // force reload
-            // Refresh inline
-            document.querySelectorAll('.org-member-panel').forEach(p => p.style.display = 'none');
+            
+            // Re-open to refresh content
+            const card = document.getElementById(`org-card-${orgId}`);
+            if (card) card.classList.remove('open');
             window.toggleOrgCard(orgId);
 
-            // Re-fetch user orgs in case the user changed their own role or it affects the dashboard UI
             const orgData = await fetchUserOrgs();
             state.userOrgs = orgData.orgs || [];
             renderDashboard(state);
@@ -103,8 +116,14 @@ window.updateOrgColor = async (orgId, color) => {
         if (res.ok) {
             const orgData = await fetchUserOrgs();
             state.userOrgs = orgData.orgs || [];
+            
+            // Re-render dashboard and panel
             renderDashboard(state);
             renderMyOrgsPanel(state.userOrgs);
+            
+            // Re-open this specific card immediately so it doesn't "flicker" closed
+            window.toggleOrgCard(orgId);
+            
             showToast("Brand color updated");
         }
     } catch (e) { console.error(e); }
