@@ -151,6 +151,7 @@ body {
 
 input[type="range"] {
   -webkit-appearance: none;
+  appearance: none;
   flex: 1;
   height: 6px;
   background: #e2e8f0;
@@ -787,20 +788,13 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .role-pill.active {
+  border-color: var(--secondary);
+  background: #eef2ff;
+  color: var(--secondary);
   cursor: default;
+  font-weight: 800;
 }
 
-.role-pill.active.admin {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  color: #1d4ed8;
-}
-
-.role-pill.active.viewer {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #475569;
-}
 
 .role-pill.active.owner {
   background: #fef9c3;

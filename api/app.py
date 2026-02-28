@@ -257,12 +257,13 @@ def join_org():
             'role': existing_role
         }), 200
 
-    user_manager.assign_org_role(org_id, g.user['uid'], 'viewer')
+    user_manager.assign_org_role(org_id, g.user['uid'], 'pending')
     return jsonify({
-        'status': 'success',
+        'status': 'pending',
         'org_id': org_id,
         'name': org_data.get('name', ''),
-        'role': 'viewer'
+        'role': 'pending',
+        'message': 'Your request to join has been submitted. An admin must approve it before you can create events.'
     }), 200
 
 
@@ -299,25 +300,82 @@ def get_org_members(org_id):
     if g.user['uid'] not in members_map and not g.user.get('is_global_admin'):
         return jsonify({'error': 'Forbidden'}), 403
 
+    admin_requests = org.get('admin_requests', {})
+
     members = []
     for uid, role in members_map.items():
         user_doc = user_manager.get_user(uid)
         email = user_doc.get('email', uid) if user_doc else uid
-        members.append({'uid': uid, 'email': email, 'role': role})
+        members.append({
+            'uid': uid,
+            'email': email,
+            'role': role,
+            'admin_requested': uid in admin_requests,
+        })
 
-    # Sort: owner first, then admin, then viewer, then alphabetically by email
-    role_order = {'owner': 0, 'admin': 1, 'viewer': 2, 'member': 3}
+    # Sort: owner first, then admin, then member/viewer, then by email
+    role_order = {'owner': 0, 'admin': 1, 'member': 2, 'viewer': 3, 'pending': 4}
     members.sort(key=lambda m: (role_order.get(m['role'], 9), m['email']))
 
     return jsonify({'members': members}), 200
+
+
+@app.route("/api/orgs/<org_id>/request-admin", methods=["POST"])
+def request_admin_access(org_id):
+    """Flag the current user as requesting admin access. Visible to org admins/owners."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    org = user_manager.get_org(org_id)
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    members_map = org.get('members', {})
+    caller_role = members_map.get(g.user['uid'])
+    if not caller_role:
+        return jsonify({'error': 'You are not a member of this organization'}), 403
+    if caller_role in ('owner', 'admin'):
+        return jsonify({'error': 'You already have admin or owner access'}), 400
+
+    # Record the request in admin_requests map: {uid: true}
+    db.collection('organizations').document(org_id).update({
+        f'admin_requests.{g.user["uid"]}': True
+    })
+    return jsonify({'status': 'success', 'message': 'Admin access request submitted'}), 200
+
+
+@app.route("/api/orgs/<org_id>", methods=["DELETE"])
+def delete_org(org_id):
+    """Delete an organization. Only the org owner (or global admin) may do this."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    org = user_manager.get_org(org_id)
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    members = org.get('members', {})
+    caller_role = members.get(g.user['uid'])
+
+    if caller_role != 'owner' and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'Only the organization owner can delete it'}), 403
+
+    # Remove org from every member's user document
+    for uid in list(members.keys()):
+        user_manager.remove_user_from_org(uid, org_id)
+
+    # Delete the organization document itself
+    db.collection('organizations').document(org_id).delete()
+
+    return jsonify({'status': 'success', 'org_id': org_id}), 200
 
 
 @app.route("/api/orgs/<org_id>/members", methods=["POST"])
 def assign_org_member(org_id):
     """Assign (or update) a role for a user within an org.
 
-    Requires the caller to be at least 'admin' in the target org,
-    or a global admin.
+    Only the org owner can promote/demote admins or grant/revoke the admin role.
+    Admins can only change viewer <-> member for non-admin, non-owner members.
     """
     if not g.user:
         return jsonify({'error': 'Authentication required'}), 401
@@ -328,29 +386,203 @@ def assign_org_member(org_id):
 
     members = org.get('members', {})
     caller_role = members.get(g.user['uid'])
-    # Roles: owner > admin > viewer  (member kept for back-compat)
-    role_hierarchy = {'owner': 3, 'admin': 2, 'viewer': 1, 'member': 1}
+    role_hierarchy = {'owner': 3, 'admin': 2, 'member': 1, 'viewer': 1}
 
+    # Must be at least admin to change anything
     if role_hierarchy.get(caller_role, 0) < role_hierarchy['admin'] and not g.user.get('is_global_admin'):
         return jsonify({'error': 'Insufficient permissions'}), 403
 
     data = request.get_json() or {}
     target_uid = data.get('uid', '').strip()
     role = data.get('role', '').strip()
-    valid_roles = {'owner', 'admin', 'viewer'}
+    valid_roles = {'owner', 'admin', 'viewer', 'member'}
 
     if not target_uid or role not in valid_roles:
-        return jsonify({'error': f'Valid uid and role ({"/".join(sorted(valid_roles))}) are required'}), 400
+        return jsonify({'error': f'Valid uid and role are required'}), 400
 
-    # Non-owners cannot promote someone to owner or change another owner's role
     target_current_role = members.get(target_uid)
-    if target_current_role == 'owner' and caller_role != 'owner' and not g.user.get('is_global_admin'):
-        return jsonify({'error': 'Only org owners can modify another owner\'s role'}), 403
-    if role == 'owner' and caller_role != 'owner' and not g.user.get('is_global_admin'):
-        return jsonify({'error': 'Only org owners can grant the owner role'}), 403
+    is_global_admin = g.user.get('is_global_admin')
 
-    user_manager.assign_org_role(org_id, target_uid, role)
+    # ── Owner-only operations ──────────────────────────────────────────────
+    # 1. Only owners can touch another owner's role
+    if target_current_role == 'owner' and caller_role != 'owner' and not is_global_admin:
+        return jsonify({'error': 'Only the org owner can modify another owner\'s role'}), 403
+
+    # 2. Only owners can grant the owner role
+    if role == 'owner' and caller_role != 'owner' and not is_global_admin:
+        return jsonify({'error': 'Only the org owner can grant the owner role'}), 403
+
+    # 3. Only owners can promote someone TO admin or demote an existing admin
+    if (role == 'admin' or target_current_role == 'admin') and caller_role != 'owner' and not is_global_admin:
+        return jsonify({'error': 'Only the org owner can change admin roles'}), 403
+
+    # ── Admin-allowed operations ───────────────────────────────────────────
+    # Admins can only set viewer / member on non-admin, non-owner members
+    # (the checks above already gate anything beyond that)
+
+    # Atomically: set the new role AND clear any pending admin-access request
+    db.collection('organizations').document(org_id).update({
+        f'members.{target_uid}': role,
+        f'admin_requests.{target_uid}': firestore.DELETE_FIELD,
+    })
+    # Keep the user's organizations array in sync
+    user_manager.users_coll.document(target_uid).set(
+        {'organizations': firestore.ArrayUnion([org_id])}, merge=True
+    )
     return jsonify({'status': 'success', 'org_id': org_id, 'uid': target_uid, 'role': role}), 200
+
+
+
+# --- Event API Routes (org-gated) ---
+
+def _user_is_org_member(uid, org_id):
+    """Return True if uid has admin or owner role in the given org.
+
+    Viewers and members can read events but cannot create/edit/delete them.
+    Pending members have no write access at all.
+    """
+    org = user_manager.get_org(org_id)
+    if not org:
+        return False
+    role = org.get('members', {}).get(uid)
+    return role in ('admin', 'owner')
+
+
+@app.route("/api/orgs/<org_id>/approve/<target_uid>", methods=["POST"])
+def approve_org_member(org_id, target_uid):
+    """Approve a pending member. Grants them 'viewer' role. Requires admin/owner."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    org = user_manager.get_org(org_id)
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    members = org.get('members', {})
+    caller_role = members.get(g.user['uid'])
+    role_hierarchy = {'owner': 3, 'admin': 2, 'viewer': 1}
+    if role_hierarchy.get(caller_role, 0) < role_hierarchy['admin'] and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'Only admins or owners can approve members'}), 403
+
+    if members.get(target_uid) != 'pending':
+        return jsonify({'error': 'User is not in a pending state'}), 400
+
+    # Approved users start as viewers — only owner can later promote to admin
+    user_manager.assign_org_role(org_id, target_uid, 'viewer')
+    return jsonify({'status': 'success', 'org_id': org_id, 'uid': target_uid, 'role': 'viewer'}), 200
+
+
+
+@app.route("/api/orgs/<org_id>/reject/<target_uid>", methods=["POST"])
+def reject_org_member(org_id, target_uid):
+    """Reject / remove a pending member from the org. Requires admin/owner."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    org = user_manager.get_org(org_id)
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    members = org.get('members', {})
+    caller_role = members.get(g.user['uid'])
+    role_hierarchy = {'owner': 3, 'admin': 2, 'member': 1, 'viewer': 1}
+    if role_hierarchy.get(caller_role, 0) < role_hierarchy['admin'] and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'Only admins or owners can reject members'}), 403
+
+    # Remove the user from the org entirely
+    db.collection('organizations').document(org_id).update({
+        f'members.{target_uid}': firestore.DELETE_FIELD
+    })
+    user_manager.remove_user_from_org(target_uid, org_id)
+    return jsonify({'status': 'success', 'org_id': org_id, 'uid': target_uid}), 200
+
+
+
+@app.route("/api/events", methods=["POST"])
+def create_event():
+    """Create a new event. Caller must be a member of the specified org."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    data = request.get_json() or {}
+    org_id   = (data.get('org_id') or '').strip()
+    title    = (data.get('title') or '').strip()
+    room_id  = (data.get('room_id') or '').strip()
+    start    = (data.get('start') or '').strip()
+    end      = (data.get('end') or '').strip()
+
+    if not all([org_id, title, room_id, start, end]):
+        return jsonify({'error': 'org_id, title, room_id, start and end are required'}), 400
+
+    if not _user_is_org_member(g.user['uid'], org_id) and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'You must be a member of the organization to create events'}), 403
+
+    event_data = {
+        'org_id':     org_id,
+        'created_by': g.user['uid'],
+        'title':      title,
+        'room_id':    room_id,
+        'start':      start,
+        'end':        end,
+        'type':       data.get('type', 'general'),
+        'organizer':  g.user['email'],
+        'status':     'scheduled',
+        'createdAt':  firestore.SERVER_TIMESTAMP,
+    }
+
+    ref = db.collection('events').add(event_data)
+    # ref is a tuple (update_time, DocumentReference) in firebase-admin SDK
+    doc_ref = ref[1] if isinstance(ref, tuple) else ref
+    return jsonify({'status': 'success', 'event_id': doc_ref.id}), 201
+
+
+@app.route("/api/events/<event_id>", methods=["PUT"])
+def update_event(event_id):
+    """Update an event. Caller must be a member of the event's org."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    event_doc = db.collection('events').document(event_id).get()
+    if not event_doc.exists:
+        return jsonify({'error': 'Event not found'}), 404
+
+    event = event_doc.to_dict()
+    org_id = event.get('org_id', '')
+
+    if not _user_is_org_member(g.user['uid'], org_id) and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'You must be a member of the organization to edit events'}), 403
+
+    data = request.get_json() or {}
+    updates = {}
+    for field in ('title', 'room_id', 'start', 'end', 'type', 'status'):
+        if field in data:
+            updates[field] = data[field]
+
+    if not updates:
+        return jsonify({'error': 'No fields to update'}), 400
+
+    db.collection('events').document(event_id).update(updates)
+    return jsonify({'status': 'success', 'event_id': event_id}), 200
+
+
+@app.route("/api/events/<event_id>", methods=["DELETE"])
+def delete_event(event_id):
+    """Delete an event. Caller must be a member of the event's org."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    event_doc = db.collection('events').document(event_id).get()
+    if not event_doc.exists:
+        return jsonify({'error': 'Event not found'}), 404
+
+    event = event_doc.to_dict()
+    org_id = event.get('org_id', '')
+
+    if not _user_is_org_member(g.user['uid'], org_id) and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'You must be a member of the organization to delete events'}), 403
+
+    db.collection('events').document(event_id).delete()
+    return jsonify({'status': 'success', 'event_id': event_id}), 200
 
 
 # --- Error Handlers ---

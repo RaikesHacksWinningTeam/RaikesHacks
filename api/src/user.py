@@ -131,3 +131,13 @@ class User:
         if user_data:
             return user_data.get('organizations', [])
         return []
+
+    def remove_user_from_org(self, uid, org_id):
+        """Remove an org ID from a user's organizations array.
+
+        Used when an organization is deleted, to clean up every member's
+        user document so they no longer see the deleted org.
+        """
+        self.users_coll.document(uid).update({
+            'organizations': firestore.ArrayRemove([org_id])
+        })

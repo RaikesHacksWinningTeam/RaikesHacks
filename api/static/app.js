@@ -3,8 +3,8 @@ const firebaseConfig = window.firebaseConfig;
 
 // Import Firebase SDK (Modular v10+)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signOut, getIdToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, onSnapshot, addDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // Initialize Firebase
 let db;
@@ -80,79 +80,106 @@ function renderDashboard() {
         return;
     }
 
-    dashboardContainer.innerHTML = `
-        <table style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
-            <thead>
-                <tr style="text-align: left; color: #64748b; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">
-                    <th style="padding: 1rem;">Organization</th>
-                    <th style="padding: 1rem;">Events</th>
-                    <th style="padding: 1rem;">Status</th>
-                    <th style="padding: 1rem;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                ${allOrganizations.map(org => {
-                    const orgEvents = events.filter(e => e.org_id === org.id);
-                    const isExpanded = expandedOrgId === org.id;
-                    const activeNow = orgEvents.some(e => {
-                        const start = new Date(e.start);
-                        const end = new Date(e.end);
-                        return start <= currentTime && end >= currentTime;
-                    });
+    svg.selectAll('g.room')
+        .data(rooms)
+        .enter()
+        .append('g')
+        .attr('class', d => `room ${selectedRoomId === d.id ? 'active' : ''}`)
+        .on('click', (event, d) => selectRoom(d.id))
+        .each(function (d) {
+            const g = d3.select(this);
+            const color = getRoomColor(d.id);
+            const isActive = selectedRoomId === d.id;
 
-                    return `
-                        <tr onclick="toggleOrgExpansion('${org.id}')" style="background: white; cursor: pointer; transition: all 0.2s; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                            <td style="padding: 1rem; border-top-left-radius: 8px; border-bottom-left-radius: 8px;">
-                                <div style="display: flex; align-items: center; gap: 1rem;">
-                                    <div style="width: 32px; height: 32px; border-radius: 8px; background:${orgColor(org.name || org.id)}; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">${(org.name || '?')[0].toUpperCase()}</div>
-                                    <span style="font-weight: 600; color: #1e293b;">${org.name}</span>
-                                </div>
-                            </td>
-                            <td style="padding: 1rem; color: #64748b;">${orgEvents.length} scheduled</td>
-                            <td style="padding: 1rem;">
-                                ${activeNow ? '<span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">Live Now</span>' : '<span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">Inactive</span>'}
-                            </td>
-                            <td style="padding: 1rem; text-align: right; border-top-right-radius: 8px; border-bottom-right-radius: 8px;">
-                                <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" style="color: #94a3b8;"></i>
-                            </td>
-                        </tr>
-                        ${isExpanded ? `
-                            <tr>
-                                <td colspan="4" style="padding: 0 1rem 1rem 1rem;">
-                                    <div style="background: #f8fafc; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; padding: 1rem; border: 1px solid #e2e8f0; border-top: none;">
-                                        ${orgEvents.length === 0 ? '<p style="color: #94a3b8; text-align: center; padding: 1rem;">No events scheduled.</p>' : orgEvents.map(e => {
-                                            const room = rooms.find(r => r.id === e.room_id);
-                                            const isLoggedIn = auth?.currentUser !== null;
-                                            return `
-                                                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: white; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid #e2e8f0;">
-                                                    <div style="font-size: 0.85rem; color: #64748b; width: 150px;">
-                                                        ${new Date(e.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${new Date(e.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                                    </div>
-                                                    <div style="flex: 1;">
-                                                        <div style="font-weight: 600; color: #1e293b;">${e.title}</div>
-                                                        <div style="font-size: 0.8rem; color: #94a3b8;"><i data-lucide="map-pin" style="width: 12px; height: 12px; display: inline-block;"></i> ${room ? room.name : 'Unknown Room'}</div>
-                                                    </div>
-                                                    <div style="display: flex; gap: 0.5rem;">
-                                                        <button onclick="event.stopPropagation(); window.openCalendarModal('${e.id}')" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;">
-                                                            <i data-lucide="calendar" style="width: 16px; height: 16px;"></i>
-                                                        </button>
-                                                        ${isLoggedIn ? `
-                                                            <button onclick="event.stopPropagation(); window.editEvent('${e.id}')" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;">
-                                                                <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
-                                                            </button>
-                                                        ` : ''}
-                                                    </div>
-                                                </div>
-                                            `;
-                                        }).join('')}
-                                    </div>
-                                </td>
-                            </tr>
-                        ` : ''}
-                    `;
-                }).join('')}
-            </tbody>
-        </table>
+            g.append('rect')
+                .attr('x', d.x)
+                .attr('y', d.y)
+                .attr('width', d.width)
+                .attr('height', d.height)
+                .attr('fill', color)
+                .attr('stroke', isActive ? 'var(--accent)' : '#cbd5e1')
+                .attr('stroke-width', isActive ? '3' : '1')
+                .attr('rx', 8)
+                .style('transition', 'all 0.2s');
+
+            g.append('text')
+                .attr('x', d.x + d.width / 2)
+                .attr('y', d.y + d.height / 2)
+                .attr('text-anchor', 'middle')
+                .attr('dominant-baseline', 'middle')
+                .attr('font-size', '13')
+                .attr('fill', (color === '#f1f5f9' || color === '#eef2ff') ? '#475569' : 'white')
+                .attr('pointer-events', 'none')
+                .attr('font-weight', '600')
+                .text(d.name);
+        });
+}
+
+function getRoomColor(roomId) {
+    const activeEvents = events.filter(e => {
+        const start = new Date(e.start);
+        const end = new Date(e.end);
+        return e.room_id === roomId && start <= currentTime && end >= currentTime;
+    });
+
+    if (activeEvents.length === 0) return '#f1f5f9';
+    if (activeEvents.some(e => e.type === 'fire_drill')) return '#ef4444';
+    if (activeEvents.some(e => e.type === 'maintenance')) return '#f59e0b';
+    return 'var(--heatmap-mid)';
+}
+
+// --- Interaction Logic ---
+function selectRoom(roomId) {
+    selectedRoomId = roomId;
+    renderFloorPlan();
+    updateSidePanel();
+}
+
+function updateSidePanel() {
+    const room = rooms.find(r => r.id === selectedRoomId);
+    if (!room) {
+        sidePanelEmpty.classList.remove('hidden');
+        sidePanelContent.classList.add('hidden');
+        return;
+    }
+
+    sidePanelEmpty.classList.add('hidden');
+    sidePanelContent.classList.remove('hidden');
+
+    const roomEvents = events.filter(e => e.room_id === room.id);
+    const isLoggedIn = auth.currentUser !== null;
+
+    sidePanelContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--primary);">${room.name}</h2>
+            <button id="btn-close-panel" class="btn-close"><i data-lucide="x"></i></button>
+        </div>
+        <div style="margin-bottom: 2rem; font-size: 0.9rem; color: #64748b;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <i data-lucide="map-pin"></i> Floor ${room.floor}
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <i data-lucide="users"></i> Capacity: ${room.capacity}
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem;">
+                ${room.tags.map(tag => `<span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">${tag}</span>`).join('')}
+            </div>
+        </div>
+        <section>
+            <h3 style="font-size: 0.9rem; font-weight: bold; text-transform: uppercase; color: #94a3b8; margin-bottom: 1rem;">Events</h3>
+            ${roomEvents.length === 0 ? '<p style="color: #94a3b8;">No events scheduled</p>' : roomEvents.map(e => `
+                <div style="padding: 1rem; background: #ffffff; border-radius: 12px; margin-bottom: 1rem; border: 1px solid #e2e8f0; border-left: 4px solid var(--secondary); position: relative;">
+                    <div style="font-weight: 700; color: var(--text-dark);">${e.title}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">${new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(e.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div style="font-size: 0.8rem; margin-top: 0.5rem;">By: ${e.organizer}</div>
+                    ${isLoggedIn ? `
+                        <button onclick="editEvent('${e.id}')" style="position: absolute; top: 0.5rem; right: 0.5rem; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;" title="Edit Event">
+                            <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            `).join('')}
+        </section>
     `;
     lucide.createIcons();
 }
@@ -173,7 +200,7 @@ window.openCalendarModal = (eventId) => {
 
     const startDate = new Date(event.start).toISOString().replace(/-|:|\.\d+/g, "");
     const endDate = new Date(event.end).toISOString().replace(/-|:|\.\d+/g, "");
-    
+
     const icsContent = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
@@ -192,7 +219,7 @@ window.openCalendarModal = (eventId) => {
 
     const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    
+
     calendarLinkInput.value = url;
     calendarModal.classList.remove('hidden');
     lucide.createIcons();
@@ -228,9 +255,7 @@ window.editEvent = (eventId) => {
     document.getElementById('modal-title').textContent = 'Edit Event';
     document.getElementById('event-id').value = event.id;
     document.getElementById('event-title').value = event.title;
-    
-    eventOrgSelect.innerHTML = allOrganizations.map(o => `<option value="${o.id}" ${o.id === event.org_id ? 'selected' : ''}>${o.name}</option>`).join('');
-    eventRoomSelect.innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id === event.room_id ? 'selected' : ''}>${r.name}</option>`).join('');
+    document.getElementById('event-room').innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id === event.room_id ? 'selected' : ''}>${r.name}</option>`).join('');
 
     const startStr = new Date(event.start).toTimeString().slice(0, 5);
     const endStr = new Date(event.end).toTimeString().slice(0, 5);
@@ -242,16 +267,19 @@ window.editEvent = (eventId) => {
 };
 
 document.getElementById('btn-create-event').onclick = () => {
+    if (!isOrgMember()) {
+        alert('You must belong to an organization to create events.');
+        return;
+    }
     document.getElementById('modal-title').textContent = 'Create New Event';
     document.getElementById('event-id').value = '';
     document.getElementById('event-title').value = '';
     document.getElementById('event-start').value = '';
     document.getElementById('event-end').value = '';
     document.getElementById('btn-delete-event').classList.add('hidden');
-    
-    eventOrgSelect.innerHTML = allOrganizations.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+    adminModal.classList.remove('hidden');
     eventRoomSelect.innerHTML = rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-    
+
     adminModal.classList.remove('hidden');
 };
 
@@ -260,15 +288,37 @@ document.getElementById('btn-cancel-modal').onclick = () => adminModal.classList
 
 document.getElementById('btn-delete-event').onclick = async () => {
     const eventId = document.getElementById('event-id').value;
-    if (confirm('Are you sure?')) {
-        await deleteDoc(doc(db, "events", eventId));
-        adminModal.classList.add('hidden');
+    if (!eventId) return;
+
+    if (confirm('Are you sure you want to delete this event?')) {
+        try {
+            await deleteDoc(doc(db, "events", eventId));
+            adminModal.classList.add('hidden');
+        } catch (error) {
+            console.error("Error deleting event:", error);
+            alert("Failed to delete event.");
+        }
     }
 };
 
+// --- Helper: can current user create/edit events? ---
+// Only admins and owners of an org can write events. Viewers/members are read-only.
+function isOrgMember() {
+    return userOrgs.some(o => o.role === 'admin' || o.role === 'owner');
+}
+
 eventForm.onsubmit = async (e) => {
     e.preventDefault();
+    if (!db) {
+        alert("Firestore not initialized. Update firebaseConfig in app.js.");
+        return;
+    }
+
     const eventId = document.getElementById('event-id').value;
+    console.log("OnSubmit eventId:", eventId);
+    const startTimeValue = document.getElementById('event-start').value;
+    const endTimeValue = document.getElementById('event-end').value;
+
     const startDate = new Date();
     const [sH, sM] = document.getElementById('event-start').value.split(':');
     startDate.setHours(parseInt(sH), parseInt(sM), 0, 0);
@@ -277,23 +327,32 @@ eventForm.onsubmit = async (e) => {
     const [eH, eM] = document.getElementById('event-end').value.split(':');
     endDate.setHours(parseInt(eH), parseInt(eM), 0, 0);
 
-    const data = {
-        org_id: eventOrgSelect.value,
-        room_id: eventRoomSelect.value,
+    const eventData = {
+        room_id: document.getElementById('event-room').value,
         title: document.getElementById('event-title').value,
         start: startDate.toISOString(),
         end: endDate.toISOString(),
+        type: 'general',
         organizer: 'Staff',
         status: 'scheduled'
     };
 
-    if (eventId) {
-        await updateDoc(doc(db, "events", eventId), data);
-    } else {
-        data.createdAt = serverTimestamp();
-        await addDoc(collection(db, "events"), data);
+    try {
+        if (eventId) {
+            console.log("Updating document:", eventId);
+            // Update existing
+            await updateDoc(doc(db, "events", eventId), eventData);
+        } else {
+            console.log("Creating new document");
+            // Create new
+            eventData.createdAt = serverTimestamp();
+            await addDoc(collection(db, "events"), eventData);
+        }
+        adminModal.classList.add('hidden');
+    } catch (error) {
+        console.error("Error saving event:", error);
+        alert("Failed to save event to Firestore.");
     }
-    adminModal.classList.add('hidden');
 };
 
 // --- Organization UI ---
@@ -334,13 +393,9 @@ async function fetchUserOrgs() {
         userOrgs = data.orgs || [];
         updateOrgSwitcher();
         renderMyOrgsPanel();
-    } catch (e) { console.error(e); }
-}
-
-function updateOrgSwitcher() {
-    const label = document.getElementById('org-switcher-label');
-    if (label) {
-        label.textContent = userOrgs.length > 1 ? `${userOrgs.length} Orgs` : (userOrgs[0]?.name || 'My Orgs');
+        updateOrgSwitcher();
+    } catch (e) {
+        console.warn('Could not load orgs:', e);
     }
 }
 
@@ -362,23 +417,28 @@ function renderMyOrgsPanel() {
         const initial = (org.name || '?')[0].toUpperCase();
         const color = orgColor(org.name || org.id);
         const role = org.role || 'viewer';
+        const isPending = role === 'pending';
         const canManage = ['owner', 'admin'].includes(role);
         const codeChip = org.invite_code
             ? `<span style="font-size:0.7rem;color:#94a3b8;margin-left:0.35rem;">· <code style="color:var(--secondary);letter-spacing:0.06em;">${org.invite_code}</code></span>`
             : '';
 
+        const subtitle = isPending
+            ? `<span style="color:#b45309;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;"><i data-lucide="clock" style="width:12px;height:12px;"></i> Waiting for admin approval</span>`
+            : (canManage ? 'Click to manage members' : 'Click to view members');
+
         return `
         <div class="org-card org-card-expandable" id="org-card-${org.id}" data-org-id="${org.id}">
-            <div class="org-card-header" onclick="toggleOrgCard('${org.id}')" style="display: flex; align-items: center; gap: 1rem; width: 100%;">
-                <div class="org-avatar" style="background:${color}; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">${initial}</div>
-                <div class="org-card-info" style="flex: 1;">
-                    <div class="org-card-name" style="font-weight: 700;">${org.name}${codeChip}</div>
-                    <div class="org-card-role" id="org-member-count-${org.id}" style="font-size: 0.75rem; color: #94a3b8;">
-                        ${canManage ? 'Manage members' : 'View members'}
+            <div class="org-card-header" onclick="toggleOrgCard('${org.id}')">
+                <div class="org-avatar" style="background:${color};">${initial}</div>
+                <div class="org-card-info">
+                    <div class="org-card-name">${org.name}${codeChip}</div>
+                    <div class="org-card-role" id="org-member-count-${org.id}">
+                        ${canManage ? 'Click to manage members' : 'Click to view members'}
                     </div>
                 </div>
                 <span class="role-badge ${role}">${role}</span>
-                <i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px; transition: transform 0.2s;"></i>
+                <i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px;"></i>
             </div>
             <div class="org-member-panel" id="org-member-panel-${org.id}" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
                 <div class="member-skeleton" style="height: 50px; background: #f1f5f9; border-radius: 8px;"></div>
@@ -418,47 +478,93 @@ function buildMemberPanel(orgId, panel) {
     const org = userOrgs.find(o => o.id === orgId);
     const myRole = org?.role || 'viewer';
     const canEdit = ['owner', 'admin'].includes(myRole);
+    const members = _memberCache[orgId] || [];
+
+    // Update subtitle count
+    const subtitle = document.getElementById(`org-member-count-${orgId}`);
+    if (subtitle) subtitle.textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
+
+    if (members.length === 0) {
+        panel.innerHTML = `<p style="color:#94a3b8;font-size:0.82rem;text-align:center;padding:0.5rem;">No members yet.</p>`;
+        return;
+    }
 
     panel.innerHTML = members.map(m => {
         const initial = (m.email || '?')[0].toUpperCase();
         const color = orgColor(m.email || m.uid);
         const role = m.role || 'viewer';
-        const isMe = m.uid === auth?.currentUser?.uid;
         const isOwner = role === 'owner';
+        const isMe = m.uid === (window._currentUid || '');
+
+        // Disable editing yourself, or editing an owner if you're not owner
         const editBlocked = isMe || (isOwner && myRole !== 'owner');
 
         const adminActive = role === 'admin' ? 'active admin' : '';
-        const viewerActive = (role === 'viewer' || role === 'member') ? 'active viewer' : '';
+        const viewerActive = role === 'viewer' || role === 'member' ? 'active viewer' : '';
+        const ownerBadge = isOwner
+            ? `<span class="role-pill active owner" style="pointer-events:none;">Owner</span>`
+            : `
+              <button class="role-pill ${adminActive}"
+                      data-org="${orgId}" data-uid="${m.uid}" data-role="admin"
+                      ${editBlocked || !canEdit ? 'disabled' : ''}
+                      onclick="setMemberRole('${orgId}','${m.uid}','admin',this)">Admin</button>
+              <button class="role-pill ${viewerActive}"
+                      data-org="${orgId}" data-uid="${m.uid}" data-role="viewer"
+                      ${editBlocked || !canEdit ? 'disabled' : ''}
+                      onclick="setMemberRole('${orgId}','${m.uid}','viewer',this)">Viewer</button>`;
 
         return `
-        <div class="member-row" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0;">
-            <div style="background:${color}; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; font-weight: 800;">${initial}</div>
-            <div style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.email}${isMe ? ' (you)' : ''}</div>
-            <div style="display: flex; gap: 0.25rem;">
-                ${isOwner ? '<span class="role-pill active owner">Owner</span>' : `
-                    <button class="role-pill ${adminActive}" onclick="setMemberRole('${orgId}','${m.uid}','admin')" ${!canEdit || editBlocked ? 'disabled' : ''}>Admin</button>
-                    <button class="role-pill ${viewerActive}" onclick="setMemberRole('${orgId}','${m.uid}','viewer')" ${!canEdit || editBlocked ? 'disabled' : ''}>Viewer</button>
-                `}
-            </div>
+        <div class="member-row" id="member-row-${orgId}-${m.uid}">
+            <div class="member-avatar-sm" style="background:${color};">${initial}</div>
+            <div class="member-email" title="${m.email}">${m.email}${isMe ? ' <span style="color:#94a3b8;">(you)</span>' : ''}</div>
+            <div class="member-role-controls">${ownerBadge}</div>
         </div>`;
     }).join('');
 }
 
-async function setMemberRole(orgId, uid, role) {
+async function setMemberRole(orgId, targetUid, newRole, clickedBtn) {
+    // Optimistic: update all pills in this row immediately
+    const row = document.getElementById(`member-row-${orgId}-${targetUid}`);
+    const pills = row?.querySelectorAll('.role-pill:not([style])');
+    pills?.forEach(p => {
+        p.classList.remove('active', 'admin', 'viewer');
+        p.classList.add('loading');
+        p.disabled = true;
+    });
+
     try {
-        let res = await fetch(`/api/orgs/${orgId}/members`, {
+        const res = await fetch(`/api/orgs/${orgId}/members`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uid, role })
         });
-        if (res.ok) {
-            _memberCache[orgId] = null; // force reload
-            toggleOrgCard(orgId); toggleOrgCard(orgId); // quick toggle to refresh
-            showToast("Role updated");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Role update failed');
+
+        // Update cache so re-opens show correct state
+        const members = _memberCache[orgId];
+        if (members) {
+            const m = members.find(m => m.uid === targetUid);
+            if (m) m.role = newRole;
         }
-    } catch (e) { console.error(e); }
+        showToast(`Role updated to ${newRole}`, 'success');
+
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+
+    // Re-render the panel to reflect new state
+    const panel = document.getElementById(`org-member-panel-${orgId}`);
+    if (panel) buildMemberPanel(orgId, panel);
 }
+
+// Expose to global scope (called from inline onclick)
+window.toggleOrgCard = toggleOrgCard;
 window.setMemberRole = setMemberRole;
+window.deleteOrg = deleteOrg;
+window.approveMember = approveMember;
+window.rejectMember = rejectMember;
+window.requestAdminAccess = requestAdminAccess;
 
 function switchOrgTab(tabId) {
     document.querySelectorAll('.org-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
@@ -469,44 +575,134 @@ document.querySelectorAll('.org-tab').forEach(tab => tab.onclick = () => switchO
 const orgModal = document.getElementById('org-modal');
 document.getElementById('btn-open-org-modal').onclick = () => {
     orgModal.classList.remove('hidden');
-    switchOrgTab('my-orgs');
-};
-document.getElementById('btn-close-org-modal').onclick = () => orgModal.classList.add('hidden');
-orgModal.onclick = (e) => { if (e.target === orgModal) orgModal.classList.add('hidden'); };
+    switchOrgTab(defaultTab);
+    lucide.createIcons();
+}
+function closeOrgModal() { orgModal.classList.add('hidden'); }
 
-document.getElementById('create-org-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const name = document.getElementById('org-name-input').value;
-    const res = await fetch('/api/orgs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
-    });
-    if (res.ok) {
-        const data = await res.json();
-        document.getElementById('new-org-code').textContent = data.invite_code;
-        document.getElementById('new-org-invite-box').classList.remove('hidden');
-        fetchUserOrgs();
-        showToast("Organization created");
-    }
-};
+if (btnOpenOrg) btnOpenOrg.onclick = () => openOrgModal();
+if (btnCloseOrg) btnCloseOrg.onclick = closeOrgModal;
 
-document.getElementById('join-org-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const code = document.getElementById('org-invite-code-input').value;
-    const res = await fetch('/api/orgs/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invite_code: code })
+// Close on backdrop click
+orgModal.addEventListener('click', (e) => {
+    if (e.target === orgModal) closeOrgModal();
+});
+
+// --- Tab switching ---
+function switchOrgTab(tabId) {
+    document.querySelectorAll('.org-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tabId);
     });
-    if (res.ok) {
-        fetchUserOrgs();
-        switchOrgTab('my-orgs');
-        showToast("Joined organization");
-    } else {
-        showToast("Invalid code", "error");
-    }
-};
+    document.querySelectorAll('.org-tab-panel').forEach(p => {
+        p.classList.toggle('active', p.id === `panel-${tabId}`);
+    });
+    lucide.createIcons();
+}
+
+document.querySelectorAll('.org-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchOrgTab(tab.dataset.tab));
+});
+
+// --- Create Org ---
+const createOrgForm = document.getElementById('create-org-form');
+const newOrgInviteBox = document.getElementById('new-org-invite-box');
+const newOrgCodeEl = document.getElementById('new-org-code');
+const btnCopyNewCode = document.getElementById('btn-copy-new-code');
+const btnCreateSubmit = document.getElementById('btn-create-org-submit');
+
+if (createOrgForm) {
+    createOrgForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('org-name-input').value.trim();
+        if (!name) return;
+
+        btnCreateSubmit.disabled = true;
+        btnCreateSubmit.innerHTML = '<i data-lucide="loader-2"></i> Creating…';
+        lucide.createIcons();
+
+        try {
+            const res = await fetch('/api/orgs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error || 'Failed to create organization');
+
+            // Show invite code
+            newOrgCodeEl.textContent = data.invite_code || '------';
+            newOrgInviteBox.classList.remove('hidden');
+            btnCreateSubmit.innerHTML = '<i data-lucide="check"></i> Organization Created!';
+            lucide.createIcons();
+
+            // Add to local list
+            userOrgs.push({ id: data.org_id, name: data.name, role: 'owner', invite_code: data.invite_code });
+            renderMyOrgsPanel();
+            updateOrgSwitcher();
+            showToast(`"${data.name}" created successfully!`, 'success');
+
+        } catch (err) {
+            showToast(err.message, 'error');
+            btnCreateSubmit.disabled = false;
+            btnCreateSubmit.innerHTML = '<i data-lucide="sparkles"></i> Create Organization';
+            lucide.createIcons();
+        }
+    };
+}
+
+// Copy invite code to clipboard
+if (btnCopyNewCode) {
+    btnCopyNewCode.onclick = () => {
+        const code = newOrgCodeEl.textContent;
+        navigator.clipboard.writeText(code).then(() => showToast('Invite code copied!', 'success'));
+    };
+}
+
+// --- Join Org ---
+const joinOrgForm = document.getElementById('join-org-form');
+const btnJoinSubmit = document.getElementById('btn-join-org-submit');
+
+if (joinOrgForm) {
+    joinOrgForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const rawCode = document.getElementById('org-invite-code-input').value.trim().toUpperCase();
+        if (!rawCode) return;
+
+        btnJoinSubmit.disabled = true;
+        btnJoinSubmit.innerHTML = '<i data-lucide="loader-2"></i> Joining…';
+        lucide.createIcons();
+
+        try {
+            const res = await fetch('/api/orgs/join', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ invite_code: rawCode })
+            });
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error || 'Invalid invite code');
+
+            if (data.status === 'already_member') {
+                showToast(`You're already a ${data.role} in "${data.name}"`, 'success');
+            } else {
+                userOrgs.push({ id: data.org_id, name: data.name, role: data.role });
+                renderMyOrgsPanel();
+                updateOrgSwitcher();
+                showToast(`Joined "${data.name}" as ${data.role}!`, 'success');
+                document.getElementById('org-invite-code-input').value = '';
+                switchOrgTab('my-orgs');
+            }
+
+        } catch (err) {
+            showToast(err.message, 'error');
+        } finally {
+            btnJoinSubmit.disabled = false;
+            btnJoinSubmit.innerHTML = '<i data-lucide="log-in"></i> Join Organization';
+            lucide.createIcons();
+        }
+    };
+}
 
 // Auth state
 onAuthStateChanged(auth, (user) => {
@@ -516,6 +712,7 @@ onAuthStateChanged(auth, (user) => {
     const orgSwitcher = document.getElementById('btn-open-org-modal');
 
     if (user) {
+        window._currentUid = user.uid; // used by member panel to label "(you)"
         createBtn?.classList.remove('hidden');
         loginLink?.classList.add('hidden');
         logoutBtn?.classList.remove('hidden');
@@ -527,6 +724,8 @@ onAuthStateChanged(auth, (user) => {
         logoutBtn?.classList.add('hidden');
         orgSwitcher?.classList.add('hidden');
         userOrgs = [];
+        // Refresh side panel so edit buttons disappear
+        if (selectedRoomId) updateSidePanel();
     }
 });
 
