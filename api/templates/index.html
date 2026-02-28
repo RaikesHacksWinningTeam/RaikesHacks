@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/dist/date-fns.min.js"></script>
 </head>
+
 <body>
     <div class="dashboard-container">
         <main class="main-content">
@@ -25,6 +27,10 @@
                     </div>
                 </div>
                 <div class="header-right">
+                    <button class="org-switcher hidden" id="btn-open-org-modal" title="Manage Organizations">
+                        <i data-lucide="building-2"></i>
+                        <span id="org-switcher-label">My Orgs</span>
+                    </button>
                     <div id="alert-controls" class="alert-controls">
                         <button class="btn btn-alert" id="btn-emergency">
                             <i data-lucide="bell"></i>
@@ -112,10 +118,96 @@
         </div>
     </div>
 
+    <!-- Organization Modal -->
+    <div id="org-modal" class="modal hidden">
+        <div class="org-modal-content">
+            <div class="org-modal-header">
+                <div>
+                    <h2>Organizations</h2>
+                    <p>Create a team or join one with an invite code.</p>
+                </div>
+                <button class="btn-close" id="btn-close-org-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <!-- Tab switcher -->
+            <div class="org-tabs">
+                <button class="org-tab active" id="tab-my-orgs" data-tab="my-orgs">
+                    <i data-lucide="layout-grid"></i> My Orgs
+                </button>
+                <button class="org-tab" id="tab-create" data-tab="create">
+                    <i data-lucide="plus-circle"></i> Create
+                </button>
+                <button class="org-tab" id="tab-join" data-tab="join">
+                    <i data-lucide="log-in"></i> Join
+                </button>
+            </div>
+
+            <div class="org-modal-body">
+
+                <!-- My Orgs panel -->
+                <div class="org-tab-panel active" id="panel-my-orgs">
+                    <div id="org-list-container" class="org-list">
+                        <div class="org-empty">
+                            <i data-lucide="building-2" style="width:40px;height:40px;opacity:0.3;"></i>
+                            <p>You haven't joined any organizations yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create panel -->
+                <div class="org-tab-panel" id="panel-create">
+                    <form id="create-org-form" autocomplete="off">
+                        <div class="org-form-group">
+                            <label for="org-name-input">Organization Name</label>
+                            <input type="text" id="org-name-input" placeholder="e.g. Raikes Hacks Team" maxlength="60"
+                                required>
+                        </div>
+                        <!-- Invite code preview (shown after creation) -->
+                        <div id="new-org-invite-box" class="hidden">
+                            <div class="invite-code-box">
+                                <div class="invite-code-label">Invite Code</div>
+                                <div class="invite-code-value" id="new-org-code">------</div>
+                                <div class="invite-code-hint">Share this code with teammates to join your org</div>
+                                <button type="button" class="btn-copy-code" id="btn-copy-new-code">
+                                    <i data-lucide="copy"></i> Copy Code
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-org-submit" id="btn-create-org-submit">
+                            <i data-lucide="sparkles"></i>
+                            Create Organization
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Join panel -->
+                <div class="org-tab-panel" id="panel-join">
+                    <form id="join-org-form" autocomplete="off">
+                        <div class="org-form-group">
+                            <label for="org-invite-code-input">Invite Code</label>
+                            <input type="text" id="org-invite-code-input" placeholder="Enter 6-character code"
+                                maxlength="10"
+                                style="text-transform: uppercase; letter-spacing: 0.12em; font-family: monospace; font-size: 1.2rem;"
+                                required>
+                        </div>
+                        <button type="submit" class="btn-org-submit" id="btn-join-org-submit">
+                            <i data-lucide="log-in"></i>
+                            Join Organization
+                        </button>
+                    </form>
+                </div>
+
+            </div><!-- /.org-modal-body -->
+        </div>
+    </div>
+
     <!-- Firebase JS SDK -->
     <script>
         window.firebaseConfig = {{ firebase_config | tojson }};
     </script>
     <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
+
 </html>
