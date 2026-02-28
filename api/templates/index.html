@@ -1,16 +1,121 @@
-{% extends "layout.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building Events Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- CDNs -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/dist/date-fns.min.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <main class="main-content">
+            <header class="header">
+                <div class="header-left">
+                    <h1 class="logo">
+                        <i data-lucide="calendar" class="logo-icon"></i>
+                        Building Events Dashboard
+                    </h1>
+                    <div id="current-time-display" class="time-badge">
+                        <i data-lucide="clock"></i>
+                        <span id="display-time">Loading...</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div id="alert-controls" class="alert-controls">
+                        <button class="btn btn-alert" id="btn-emergency">
+                            <i data-lucide="bell"></i>
+                            Alerts
+                        </button>
+                    </div>
+                    <button class="btn btn-primary" id="btn-create-event">
+                        <i data-lucide="plus"></i>
+                        Create Event
+                    </button>
+                    <a href="/login" class="user-avatar" id="btn-login-page" title="Admin Login">
+                        <i data-lucide="user"></i>
+                    </a>
+                    <button class="btn btn-secondary hidden" id="btn-logout" title="Logout">
+                        <i data-lucide="log-out"></i>
+                    </button>
+                </div>
+            </header>
 
-{% block title %}
-Main
-{% endblock %}
+            <div id="floor-plan-container" class="floor-plan-container">
+                <!-- SVG will be injected here by D3 -->
+            </div>
 
-{% block main %}
-<main class="container py-5 text-center">
-    <div>
-        <h1>Hello, World</h1>
+            <footer class="timeline-bar">
+                <div class="timeline-info">
+                    <span class="timeline-title">Timeline Explorer</span>
+                    <span class="timeline-subtitle">Drag to view upcoming shifts</span>
+                </div>
+                <input type="range" id="timeline-slider" min="0" max="24" value="0" step="1">
+                <div class="timeline-legend">
+                    <span class="timeline-title">Next 24 Hours</span>
+                    <span class="timeline-subtitle">Real-time updates active</span>
+                </div>
+            </footer>
+        </main>
+
+        <aside id="side-panel" class="sidebar">
+            <div id="side-panel-empty" class="side-panel-placeholder">
+                <i data-lucide="calendar" class="placeholder-icon"></i>
+                <p>Select a room to see details</p>
+            </div>
+            <div id="side-panel-content" class="side-panel-content hidden">
+                <!-- Room details injected by JS -->
+            </div>
+        </aside>
     </div>
-    <div>
-        <p>This is more text</p>
+
+    <!-- Admin Modal -->
+    <div id="admin-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Event</h2>
+                <button class="btn-close" id="btn-close-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="event-form">
+                    <div class="form-group">
+                        <label>Event Title</label>
+                        <input type="text" id="event-title" placeholder="e.g., Finals Prep Session" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Room</label>
+                        <select id="event-room" required>
+                            <!-- Options injected by JS -->
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Start Time</label>
+                            <input type="time" id="event-start" required>
+                        </div>
+                        <div class="form-group">
+                            <label>End Time</label>
+                            <input type="time" id="event-end" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-</main>
-{% endblock %}
+
+    <!-- Firebase JS SDK -->
+    <script>
+        window.firebaseConfig = {{ firebase_config | tojson }};
+    </script>
+    <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
