@@ -45,8 +45,8 @@ window.toggleOrgExpansion = (orgId) => {
     renderDashboard(state);
 };
 
-window.openCalendarModal = (eventId) => {
-    openCalendarModal(eventId, state);
+window.openOrgCalendar = (orgId) => {
+    openCalendarModal(orgId, state);
 };
 
 window.editEvent = (eventId) => {
@@ -272,6 +272,130 @@ document.addEventListener("DOMContentLoaded", () => {
                 showToast("Joined organization");
             } else {
                 showToast("Invalid code", "error");
+            }
+        };
+    }
+
+    // --- Sync Calendar Handlers ---
+    const btnSyncCalendar = document.getElementById('btn-sync-calendar');
+    const syncModal = document.getElementById('sync-modal');
+    const syncOrgList = document.getElementById('sync-org-list');
+    const btnGenerateSync = document.getElementById('btn-generate-sync');
+    const syncLinkContainer = document.getElementById('sync-link-container');
+    const syncCalendarLinkInput = document.getElementById('sync-calendar-link-input');
+    const btnCopySyncLink = document.getElementById('btn-copy-sync-link');
+
+    if (btnSyncCalendar) {
+        btnSyncCalendar.onclick = () => {
+            if (!state.allOrganizations || state.allOrganizations.length === 0) {
+                showToast("No organizations available to sync.", "error");
+                return;
+            }
+
+            syncOrgList.innerHTML = '';
+            syncLinkContainer.classList.add('hidden');
+            syncCalendarLinkInput.value = '';
+
+            // Add Select All checkbox
+            const selectAllLabel = document.createElement('label');
+            selectAllLabel.style.display = 'flex';
+            selectAllLabel.style.alignItems = 'center';
+            selectAllLabel.style.gap = '0.5rem';
+            selectAllLabel.style.cursor = 'pointer';
+            selectAllLabel.style.paddingBottom = '0.5rem';
+            selectAllLabel.style.marginBottom = '0.5rem';
+            selectAllLabel.style.borderBottom = '1px solid #e2e8f0';
+            selectAllLabel.style.fontWeight = 'bold';
+
+            const selectAllCheckbox = document.createElement('input');
+            selectAllCheckbox.type = 'checkbox';
+            selectAllCheckbox.id = 'sync-select-all';
+
+            const selectAllSpan = document.createElement('span');
+            selectAllSpan.textContent = 'Select All Organizations';
+
+            selectAllLabel.appendChild(selectAllCheckbox);
+            selectAllLabel.appendChild(selectAllSpan);
+            syncOrgList.appendChild(selectAllLabel);
+
+            state.allOrganizations.forEach(org => {
+                const label = document.createElement('label');
+                label.style.display = 'flex';
+                label.style.alignItems = 'center';
+                label.style.gap = '0.5rem';
+                label.style.cursor = 'pointer';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = org.id;
+                checkbox.className = 'sync-org-checkbox';
+
+                // Add change listener to "Select All" checkbox instead of all individual
+                checkbox.addEventListener('change', () => {
+                    const allChecked = Array.from(document.querySelectorAll('.sync-org-checkbox')).every(cb => cb.checked);
+                    const someChecked = Array.from(document.querySelectorAll('.sync-org-checkbox')).some(cb => cb.checked);
+                    selectAllCheckbox.checked = allChecked;
+                    selectAllCheckbox.indeterminate = someChecked && !allChecked;
+                });
+
+                const span = document.createElement('span');
+                span.textContent = org.name;
+
+                label.appendChild(checkbox);
+                label.appendChild(span);
+                syncOrgList.appendChild(label);
+            });
+
+            selectAllCheckbox.addEventListener('change', (e) => {
+                document.querySelectorAll('.sync-org-checkbox').forEach(cb => {
+                    cb.checked = e.target.checked;
+                });
+            });
+
+            syncModal?.classList.remove('hidden');
+        };
+    }
+
+    if (document.getElementById('btn-close-sync-modal')) {
+        document.getElementById('btn-close-sync-modal').onclick = () => syncModal?.classList.add('hidden');
+    }
+    if (document.getElementById('btn-close-sync-modal-footer')) {
+        document.getElementById('btn-close-sync-modal-footer').onclick = () => syncModal?.classList.add('hidden');
+    }
+
+    if (btnGenerateSync) {
+        btnGenerateSync.onclick = () => {
+            const checkboxes = document.querySelectorAll('.sync-org-checkbox:checked');
+            if (checkboxes.length === 0) {
+                showToast("Please select at least one organization.", "error");
+                return;
+            }
+            const selectedOrgIds = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedOrgIds.length === 1) {
+                const link = `${window.location.origin}/api/orgs/${selectedOrgIds[0]}/calendar.ics`;
+                syncCalendarLinkInput.value = link;
+            } else {
+                const link = `${window.location.origin}/api/calendar/multi.ics?orgs=${selectedOrgIds.join(',')}`;
+                syncCalendarLinkInput.value = link;
+            }
+            syncLinkContainer.classList.remove('hidden');
+        };
+    }
+
+    if (btnCopySyncLink) {
+        btnCopySyncLink.onclick = () => {
+            if (syncCalendarLinkInput) {
+                syncCalendarLinkInput.select();
+                navigator.clipboard.writeText(syncCalendarLinkInput.value).then(() => {
+                    const originalHtml = btnCopySyncLink.innerHTML;
+                    btnCopySyncLink.innerHTML = '<i data-lucide="check" style="width: 18px; height: 18px;"></i> Copied!';
+                    if (window.lucide) window.lucide.createIcons();
+                    setTimeout(() => {
+                        btnCopySyncLink.innerHTML = originalHtml;
+                        if (window.lucide) window.lucide.createIcons();
+                    }, 2000);
+                });
             }
         };
     }

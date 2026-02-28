@@ -1,38 +1,22 @@
-export function openCalendarModal(eventId, state) {
-    const event = state.events.find(e => e.id === eventId);
-    if (!event) return;
+// Example logic to update in calendar.js
+export function openCalendarModal(orgId, state) {
+    const org = state.userOrgs.find(o => o.id === orgId);
+    if (!org) return;
 
-    const startDate = new Date(event.start).toISOString().replace(/-|:|\.\d+/g, "");
-    const endDate = new Date(event.end).toISOString().replace(/-|:|\.\d+/g, "");
+    // The feed URL from your Flask server
+    const baseUrl = `${window.location.host}/api/orgs/${orgId}/calendar.ics`;
+    const httpsUrl = `https://${baseUrl}`;
+    const webcalUrl = `webcal://${baseUrl}`;
 
-    const icsContent = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//RaikesHacks2026//BuildingEvents//EN",
-        "BEGIN:VEVENT",
-        `UID:${event.id}@raikeshacks.com`,
-        `DTSTAMP:${new Date().toISOString().replace(/-|:|\.\d+/g, "")}`,
-        `DTSTART:${startDate}`,
-        `DTEND:${endDate}`,
-        `SUMMARY:${event.title}`,
-        `DESCRIPTION:Event organized by ${event.organizer}`,
-        `LOCATION:Room: ${event.room_id}`,
-        "END:VEVENT",
-        "END:VCALENDAR"
-    ].join("\r\n");
+    document.getElementById('calendar-modal-title').textContent = `Sync ${org.name}`;
 
-    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+    // Set the direct link
+    const subscribeBtn = document.getElementById('btn-subscribe-calendar');
+    subscribeBtn.href = webcalUrl;
 
-    const calendarModal = document.getElementById('calendar-modal');
+    // Set the manual copy link
     const calendarLinkInput = document.getElementById('calendar-link-input');
+    calendarLinkInput.value = httpsUrl;
 
-    if (calendarLinkInput) calendarLinkInput.value = url;
-    if (calendarModal) {
-        calendarModal.classList.remove('hidden');
-    }
-
-    if (window.lucide) {
-        window.lucide.createIcons();
-    }
+    document.getElementById('calendar-modal').classList.remove('hidden');
 }

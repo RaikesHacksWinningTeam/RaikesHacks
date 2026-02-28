@@ -9,6 +9,10 @@ from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 
+from icalendar import Calendar, Event
+from flask import Response
+from datetime import datetime
+
 from extensions import db
 from src.user import User
 
@@ -351,6 +355,98 @@ def assign_org_member(org_id):
 
     user_manager.assign_org_role(org_id, target_uid, role)
     return jsonify({'status': 'success', 'org_id': org_id, 'uid': target_uid, 'role': role}), 200
+
+
+
+@app.route("/api/orgs/<org_id>/calendar.ics", methods=["GET"])
+def get_org_calendar_feed(org_id):
+    # 1. Verify the organization exists
+    org = user_manager.get_org(org_id)
+    if not org:
+        return "Organization not found", 404
+
+    # 2. Fetch events for this org from Firestore
+    # Note: Ensure you have a 'events' collection where each doc has 'org_id'
+    events_ref = db.collection('events').where('org_id', '==', org_id).stream()
+
+    cal = Calendar()
+    cal.add('prodid', f'-//{org.get("name")}//BuildingEvents//EN')
+    cal.add('version', '2.0')
+    cal.add('x-wr-calname', f"{org.get('name')} Events") # Shows as name in Google Cal
+
+    for doc in events_ref:
+        e_data = doc.to_dict()
+        event = Event()
+        
+        event.add('summary', e_data.get('title', 'Untitled Event'))
+        
+        # Convert ISO strings from Firestore to datetime objects
+        start = datetime.fromisoformat(e_data['start'].replace('Z', '+00:00'))
+        end = datetime.fromisoformat(e_data['end'].replace('Z', '+00:00'))
+        
+        event.add('dtstart', start)
+        event.add('dtend', end)
+        event.add('dtstamp', datetime.utcnow())
+        event.add('uid', f"{doc.id}@raikeshacks.com")
+        event.add('description', f"Organized by {e_data.get('organizer', 'Staff')}")
+        
+        # Fetch room name if needed, or just use room_id
+        event.add('location', f"Room: {e_data.get('room_id')}")
+        
+        cal.add_component(event)
+
+    return Response(
+        cal.to_ical(),
+        mimetype="text/calendar",
+        headers={"Content-Disposition": f"attachment; filename={org_id}.ics"}
+    )
+    
+@app.route("/api/calendar/multi.ics", methods=["GET"])
+def get_multi_org_calendar_feed():
+    org_ids_str = request.args.get('orgs', '')
+    if not org_ids_str:
+        return "No organizations provided", 400
+        
+    org_ids = [oid.strip() for oid in org_ids_str.split(',') if oid.strip()]
+    if not org_ids:
+        return "No valid organizations provided", 400
+        
+    cal = Calendar()
+    cal.add('prodid', '-//Multiple Orgs//BuildingEvents//EN')
+    cal.add('version', '2.0')
+    cal.add('x-wr-calname', 'Combined Events')
+    
+    for org_id in org_ids:
+        org = user_manager.get_org(org_id)
+        if not org:
+            continue
+            
+        events_ref = db.collection('events').where('org_id', '==', org_id).stream()
+        for doc in events_ref:
+            e_data = doc.to_dict()
+            event = Event()
+            
+            event.add('summary', e_data.get('title', 'Untitled Event'))
+            
+            try:
+                start = datetime.fromisoformat(e_data['start'].replace('Z', '+00:00'))
+                end = datetime.fromisoformat(e_data['end'].replace('Z', '+00:00'))
+            except Exception:
+                continue
+                
+            event.add('dtstart', start)
+            event.add('dtend', end)
+            event.add('dtstamp', datetime.utcnow())
+            event.add('uid', f"{doc.id}@raikeshacks.com")
+            event.add('description', f"Organized by {e_data.get('organizer', 'Staff')} - Org: {org.get('name')}")
+            event.add('location', f"Room: {e_data.get('room_id')}")
+            cal.add_component(event)
+
+    return Response(
+        cal.to_ical(),
+        mimetype="text/calendar",
+        headers={"Content-Disposition": "attachment; filename=combined_calendar.ics"}
+    )
 
 
 # --- Error Handlers ---

@@ -60,15 +60,24 @@
                 </div>
             </div>
 
-            <footer class="timeline-bar">
-                <div class="timeline-info">
-                    <span class="timeline-title">Timeline Explorer</span>
-                    <span class="timeline-subtitle">View scheduled events</span>
+            <footer class="timeline-bar"
+                style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem;">
+                <div style="display: flex; gap: 2rem; align-items: center;">
+                    <div class="timeline-info">
+                        <span class="timeline-title">Timeline Explorer</span>
+                        <span class="timeline-subtitle">View scheduled events</span>
+                    </div>
+                    <div class="timeline-legend" style="text-align: left;">
+                        <span class="timeline-title">Real-time Dashboard</span>
+                        <span class="timeline-subtitle">Automatically updating</span>
+                    </div>
                 </div>
-                <div class="timeline-legend">
-                    <span class="timeline-title">Real-time Dashboard</span>
-                    <span class="timeline-subtitle">Automatically updating</span>
-                </div>
+
+                <button class="btn btn-primary" id="btn-sync-calendar"
+                    style="padding: 0.6rem 1.2rem; font-size: 0.85rem; border-radius: 8px; display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="calendar-plus" style="width: 18px; height: 18px;"></i>
+                    Sync to Calendar
+                </button>
             </footer>
         </main>
     </div>
@@ -244,6 +253,42 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="btn-close-calendar-modal-footer">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Modal -->
+    <div id="sync-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Sync Calendars</h2>
+                <button class="btn-close" id="btn-close-sync-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: #64748b; font-size: 0.9rem;">
+                    Select the organizations you want to sync to your calendar.
+                </p>
+                <div id="sync-org-list"
+                    style="margin-bottom: 1rem; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <!-- Checkboxes injected by JS -->
+                </div>
+                <div class="form-group hidden" id="sync-link-container">
+                    <label>Combined Calendar Link (.ics)</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="sync-calendar-link-input" readonly
+                            style="flex: 1; background: #f8fafc; cursor: text;">
+                        <button class="btn btn-primary" id="btn-copy-sync-link" title="Copy to clipboard">
+                            <i data-lucide="copy" style="width: 18px; height: 18px;"></i>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btn-close-sync-modal-footer">Close</button>
+                <button type="button" class="btn btn-primary" id="btn-generate-sync">Generate Link</button>
             </div>
         </div>
     </div>
