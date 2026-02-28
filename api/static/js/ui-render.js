@@ -185,10 +185,11 @@ export function buildMemberPanel(orgId, panel, members, userOrgs) {
             <div style="background:${color}; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; font-weight: 800;">${initial}</div>
             <div style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.email}${isMe ? ' (you)' : ''}</div>
             <div style="display: flex; gap: 0.25rem;">
-                ${isOwner ? '<span class="role-pill active owner">Owner</span>' : `
-                    <button class="role-pill ${adminActive}" onclick="window.setMemberRole('${orgId}','${m.uid}','admin')" ${!canEdit || editBlocked ? 'disabled' : ''}>Admin</button>
-                    <button class="role-pill ${viewerActive}" onclick="window.setMemberRole('${orgId}','${m.uid}','viewer')" ${!canEdit || editBlocked ? 'disabled' : ''}>Viewer</button>
-                `}
+                ${isOwner ? '<span class="role-pill active owner">Owner</span>' : (
+                role === 'admin'
+                    ? `<button class="role-pill ${adminActive}" onclick="window.setMemberRole('${orgId}','${m.uid}','viewer')" ${!canEdit || editBlocked ? 'disabled' : ''}>Revoke Admin</button>`
+                    : `<button class="role-pill ${viewerActive}" onclick="window.setMemberRole('${orgId}','${m.uid}','admin')" ${!canEdit || editBlocked ? 'disabled' : ''}>Grant Admin</button>`
+            )}
             </div>
         </div>`;
     }).join('');
