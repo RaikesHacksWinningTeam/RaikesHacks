@@ -237,9 +237,10 @@ window.editEvent = (eventId) => {
     document.getElementById('event-title').value = event.title;
     document.getElementById('event-room').innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id === event.room_id ? 'selected' : ''}>${r.name}</option>`).join('');
 
-    // Populate org select — pre-select the event's org if present
+    // Populate org select — only orgs where user is admin or owner
     const orgSelect = document.getElementById('event-org');
-    orgSelect.innerHTML = userOrgs.map(o => `<option value="${o.id}" ${o.id === event.org_id ? 'selected' : ''}>${o.name}</option>`).join('');
+    const editableOrgs = userOrgs.filter(o => o.role === 'admin' || o.role === 'owner');
+    orgSelect.innerHTML = editableOrgs.map(o => `<option value="${o.id}" ${o.id === event.org_id ? 'selected' : ''}>${o.name}</option>`).join('');
 
     const startStr = new Date(event.start).toTimeString().slice(0, 5);
     const endStr = new Date(event.end).toTimeString().slice(0, 5);
@@ -277,8 +278,9 @@ document.getElementById('btn-create-event').onclick = () => {
     document.getElementById('event-start').value = '';
     document.getElementById('event-end').value = '';
     document.getElementById('btn-delete-event').classList.add('hidden');
-    // Populate org select
-    document.getElementById('event-org').innerHTML = userOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+    // Populate org select — only orgs where user is admin or owner
+    const editableOrgs = userOrgs.filter(o => o.role === 'admin' || o.role === 'owner');
+    document.getElementById('event-org').innerHTML = editableOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
     adminModal.classList.remove('hidden');
     eventRoomSelect.innerHTML = rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
 };
@@ -303,9 +305,10 @@ document.getElementById('btn-delete-event').onclick = async () => {
     }
 };
 
-// --- Helper: is current user a member of at least one org? ---
+// --- Helper: can current user create/edit events? ---
+// Only admins and owners of an org can write events. Viewers/members are read-only.
 function isOrgMember() {
-    return userOrgs.length > 0;
+    return userOrgs.some(o => o.role === 'admin' || o.role === 'owner');
 }
 
 eventForm.onsubmit = async (e) => {
@@ -471,22 +474,27 @@ function renderMyOrgsPanel() {
         const initial = (org.name || '?')[0].toUpperCase();
         const color = orgColor(org.name || org.id);
         const role = org.role || 'viewer';
+        const isPending = role === 'pending';
         const canManage = ['owner', 'admin'].includes(role);
         const codeChip = org.invite_code
             ? `<span style="font-size:0.7rem;color:#94a3b8;margin-left:0.35rem;">· <code style="color:var(--secondary);letter-spacing:0.06em;">${org.invite_code}</code></span>`
             : '';
 
+        const subtitle = isPending
+            ? `<span style="color:#b45309;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;"><i data-lucide="clock" style="width:12px;height:12px;"></i> Waiting for admin approval</span>`
+            : (canManage ? 'Click to manage members' : 'Click to view members');
+
         return `
         <div class="org-card org-card-expandable" id="org-card-${org.id}" data-org-id="${org.id}">
-            <div class="org-card-header" onclick="toggleOrgCard('${org.id}')">
+            <div class="org-card-header" ${isPending ? '' : `onclick="toggleOrgCard('${org.id}')"`} style="${isPending ? 'cursor:default;' : ''}">
                 <div class="org-avatar" style="background:${color};">${initial}</div>
                 <div class="org-card-info">
                     <div class="org-card-name">${org.name}${codeChip}</div>
                     <div class="org-card-role" id="org-member-count-${org.id}">
-                        ${canManage ? 'Click to manage members' : 'Click to view members'}
+                        ${subtitle}
                     </div>
                 </div>
-                <span class="role-badge ${role}">${role}</span>
+                <span class="role-badge ${role}" style="${isPending ? 'background:#fef3c7;color:#92400e;border-color:#fde68a;' : ''}">${role}</span>
                 ${role === 'owner' ? `
                 <button class="btn-delete-org" title="Delete Organization"
                     onclick="event.stopPropagation(); deleteOrg('${org.id}', '${org.name.replace(/'/g, "&#39;")}')"
@@ -494,7 +502,7 @@ function renderMyOrgsPanel() {
                     onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'">
                     <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
                 </button>` : ''}
-                <i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px;"></i>
+                ${!isPending ? `<i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px;"></i>` : ''}
             </div>
             <div class="org-member-panel" id="org-member-panel-${org.id}">
                 <div class="member-skeleton">
@@ -545,59 +553,159 @@ function buildMemberPanel(orgId, panel) {
     const org = userOrgs.find(o => o.id === orgId);
     const myRole = org?.role || 'viewer';
     const canEdit = ['owner', 'admin'].includes(myRole);
-    const members = _memberCache[orgId] || [];
+    const allMembers = _memberCache[orgId] || [];
+
+    const pendingMembers = allMembers.filter(m => m.role === 'pending');
+    const activeMembers = allMembers.filter(m => m.role !== 'pending');
 
     // Update subtitle count
     const subtitle = document.getElementById(`org-member-count-${orgId}`);
-    if (subtitle) subtitle.textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
+    if (subtitle) subtitle.textContent = `${activeMembers.length} member${activeMembers.length !== 1 ? 's' : ''}${pendingMembers.length ? ` · ${pendingMembers.length} pending` : ''}`;
 
-    if (members.length === 0) {
+    if (allMembers.length === 0) {
         panel.innerHTML = `<p style="color:#94a3b8;font-size:0.82rem;text-align:center;padding:0.5rem;">No members yet.</p>`;
         return;
     }
 
-    panel.innerHTML = members.map(m => {
+    // ---- ADMIN / OWNER VIEW ----
+    if (canEdit) {
+        const renderActiveMember = (m) => {
+            const initial = (m.email || '?')[0].toUpperCase();
+            const color = orgColor(m.email || m.uid);
+            const role = m.role || 'viewer';
+            const isOwner = role === 'owner';
+            const isAdmin = role === 'admin';
+            const isMe = m.uid === (window._currentUid || '');
+
+            const adminReqBadge = m.admin_requested
+                ? `<span style="font-size:0.7rem;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:5px;padding:0.1rem 0.45rem;margin-right:0.3rem;white-space:nowrap;">★ Wants Admin</span>`
+                : '';
+
+            let roleControls;
+            if (isOwner) {
+                // Owner badge — never editable
+                roleControls = `<span class="role-pill active owner" style="pointer-events:none;">Owner</span>`;
+            } else if (isAdmin && myRole !== 'owner') {
+                // Admins cannot touch other admins — read-only badge
+                roleControls = `<span class="role-pill active" style="pointer-events:none;" title="Only the owner can change admin roles">Admin</span>`;
+            } else {
+                // Single Admin toggle: ON = admin (active/blue), OFF = viewer (inactive)
+                // Clicking toggles between the two states
+                const nextRole = isAdmin ? 'viewer' : 'admin';
+                const isActive = isAdmin ? 'active' : '';
+                const isDisabled = isMe ? 'disabled' : '';
+                const label = isAdmin ? 'Admin' : 'Grant Admin';
+                roleControls = `
+                    <button class="role-pill ${isActive}" ${isDisabled}
+                            title="${isAdmin ? 'Click to remove admin access (reverts to Viewer)' : 'Click to grant Admin access'}"
+                            onclick="setMemberRole('${orgId}','${m.uid}','${nextRole}',this)">
+                        ${label}
+                    </button>`;
+
+            }
+
+            return `
+            <div class="member-row" id="member-row-${orgId}-${m.uid}" ${m.admin_requested ? 'style="border-left:3px solid #f59e0b;padding-left:0.65rem;"' : ''}>
+                <div class="member-avatar-sm" style="background:${color};">${initial}</div>
+                <div class="member-email" title="${m.email}" style="flex:1;">
+                    ${m.email}${isMe ? ' <span style="color:#94a3b8;">(you)</span>' : ''}
+                    ${adminReqBadge}
+                </div>
+                <div class="member-role-controls">${roleControls}</div>
+            </div>`;
+        };
+
+
+
+        // Pending section
+        const pendingSection = pendingMembers.length > 0 ? `
+            <div style="background:#fefce8;border:1px solid #fde047;border-radius:10px;padding:0.75rem 1rem;margin-bottom:0.75rem;">
+                <div style="font-size:0.75rem;font-weight:700;color:#854d0e;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.4rem;">
+                    <i data-lucide="clock" style="width:13px;height:13px;"></i>
+                    Pending Approval
+                </div>
+                ${pendingMembers.map(m => {
+            const initial = (m.email || '?')[0].toUpperCase();
+            const color = orgColor(m.email || m.uid);
+            return `
+                    <div class="member-row" id="member-row-${orgId}-${m.uid}" style="background:transparent;border:none;padding:0.35rem 0;">
+                        <div class="member-avatar-sm" style="background:${color};">${initial}</div>
+                        <div class="member-email" title="${m.email}" style="flex:1;">${m.email}</div>
+                        <div style="display:flex;gap:0.35rem;">
+                            <button onclick="approveMember('${orgId}','${m.uid}')"
+                                style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:0.25rem 0.65rem;font-size:0.75rem;font-weight:600;cursor:pointer;">
+                                Approve
+                            </button>
+                            <button onclick="rejectMember('${orgId}','${m.uid}')"
+                                style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:0.25rem 0.65rem;font-size:0.75rem;font-weight:600;cursor:pointer;">
+                                Reject
+                            </button>
+                        </div>
+                    </div>`;
+        }).join('')}
+            </div>` : '';
+
+        panel.innerHTML = pendingSection + activeMembers.map(renderActiveMember).join('');
+        lucide.createIcons();
+        return;
+    }
+
+    // ---- REGULAR MEMBER / VIEWER VIEW ----
+    const meEntry = allMembers.find(m => m.uid === (window._currentUid || ''));
+    const ownersList = activeMembers.filter(m => m.role === 'owner');
+    const alreadyRequested = meEntry?.admin_requested || false;
+
+    const renderSimpleRow = (m, isHighlighted = false) => {
         const initial = (m.email || '?')[0].toUpperCase();
         const color = orgColor(m.email || m.uid);
-        const role = m.role || 'viewer';
-        const isOwner = role === 'owner';
-        const isMe = m.uid === (window._currentUid || '');
-
-        // Disable editing yourself, or editing an owner if you're not owner
-        const editBlocked = isMe || (isOwner && myRole !== 'owner');
-
-        const adminActive = role === 'admin' ? 'active admin' : '';
-        const viewerActive = role === 'viewer' || role === 'member' ? 'active viewer' : '';
-        const ownerBadge = isOwner
-            ? `<span class="role-pill active owner" style="pointer-events:none;">Owner</span>`
-            : `
-              <button class="role-pill ${adminActive}"
-                      data-org="${orgId}" data-uid="${m.uid}" data-role="admin"
-                      ${editBlocked || !canEdit ? 'disabled' : ''}
-                      onclick="setMemberRole('${orgId}','${m.uid}','admin',this)">Admin</button>
-              <button class="role-pill ${viewerActive}"
-                      data-org="${orgId}" data-uid="${m.uid}" data-role="viewer"
-                      ${editBlocked || !canEdit ? 'disabled' : ''}
-                      onclick="setMemberRole('${orgId}','${m.uid}','viewer',this)">Viewer</button>`;
-
+        const rolePill = m.role === 'owner'
+            ? `<span class="role-pill active owner" style="pointer-events:none;font-size:0.7rem;">Owner</span>`
+            : `<span class="role-pill" style="pointer-events:none;font-size:0.7rem;opacity:0.7;">${m.role}</span>`;
         return `
-        <div class="member-row" id="member-row-${orgId}-${m.uid}">
+        <div class="member-row" style="${isHighlighted ? 'border-left:3px solid var(--secondary);padding-left:0.65rem;' : ''}">
             <div class="member-avatar-sm" style="background:${color};">${initial}</div>
-            <div class="member-email" title="${m.email}">${m.email}${isMe ? ' <span style="color:#94a3b8;">(you)</span>' : ''}</div>
-            <div class="member-role-controls">${ownerBadge}</div>
+            <div class="member-email" title="${m.email}" style="flex:1;${isHighlighted ? 'font-weight:700;color:var(--primary);' : ''}">
+                ${m.email}${isHighlighted ? ' <span style="color:#94a3b8;">(you)</span>' : ''}
+            </div>
+            <div class="member-role-controls">${rolePill}</div>
         </div>`;
-    }).join('');
+    };
+
+    const myRow = meEntry ? renderSimpleRow(meEntry, true) : '';
+    const ownerRows = ownersList
+        .filter(m => m.uid !== meEntry?.uid)
+        .map(m => renderSimpleRow(m))
+        .join('');
+
+    const requestBtn = `
+        <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid #e2e8f0;">
+            <button id="btn-request-admin-${orgId}"
+                onclick="requestAdminAccess('${orgId}')"
+                ${alreadyRequested ? 'disabled' : ''}
+                style="width:100%;display:flex;align-items:center;justify-content:center;gap:0.5rem;
+                       padding:0.55rem 1rem;border-radius:8px;font-size:0.82rem;font-weight:600;
+                       cursor:${alreadyRequested ? 'default' : 'pointer'};
+                       border:1px solid ${alreadyRequested ? '#d1fae5' : 'var(--secondary)'};
+                       background:${alreadyRequested ? '#f0fdf4' : 'transparent'};
+                       color:${alreadyRequested ? '#16a34a' : 'var(--secondary)'};
+                       transition:all 0.15s;">
+                <i data-lucide="${alreadyRequested ? 'check-circle' : 'shield-plus'}" style="width:15px;height:15px;"></i>
+                ${alreadyRequested ? 'Admin Access Requested ✓' : 'Request Admin Access'}
+            </button>
+        </div>`;
+
+    panel.innerHTML = myRow
+        + (ownerRows ? `<div style="font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin:0.65rem 0 0.35rem;">Organization Owner</div>` + ownerRows : '')
+        + requestBtn;
+    lucide.createIcons();
 }
 
 async function setMemberRole(orgId, targetUid, newRole, clickedBtn) {
-    // Optimistic: update all pills in this row immediately
-    const row = document.getElementById(`member-row-${orgId}-${targetUid}`);
-    const pills = row?.querySelectorAll('.role-pill:not([style])');
-    pills?.forEach(p => {
-        p.classList.remove('active', 'admin', 'viewer');
-        p.classList.add('loading');
-        p.disabled = true;
-    });
+    const originalHTML = clickedBtn?.innerHTML;
+    if (clickedBtn) {
+        clickedBtn.disabled = true;
+        clickedBtn.innerHTML = '…';
+    }
 
     try {
         const res = await fetch(`/api/orgs/${orgId}/members`, {
@@ -608,22 +716,47 @@ async function setMemberRole(orgId, targetUid, newRole, clickedBtn) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Role update failed');
 
-        // Update cache so re-opens show correct state
-        const members = _memberCache[orgId];
-        if (members) {
-            const m = members.find(m => m.uid === targetUid);
-            if (m) m.role = newRole;
-        }
         showToast(`Role updated to ${newRole}`, 'success');
+
+        // 1. Update local member cache — set role and clear any admin request flag
+        if (_memberCache[orgId]) {
+            const member = _memberCache[orgId].find(m => m.uid === targetUid);
+            if (member) {
+                member.role = newRole;
+                member.admin_requested = false;  // role resolved, badge should disappear
+            }
+        }
+
+        // 2. If changing own role, sync the global userOrgs state so Create Event
+        //    button and org select get updated immediately
+        if (targetUid === window._currentUid) {
+            const orgIndex = userOrgs.findIndex(o => o.id === orgId);
+            if (orgIndex !== -1) {
+                userOrgs[orgIndex].role = newRole;
+                updateOrgSwitcher();
+                // Re-evaluate Create Event button visibility
+                const createBtn = document.getElementById('btn-create-event');
+                if (createBtn) {
+                    createBtn.classList.toggle('hidden', !isOrgMember());
+                }
+            }
+        }
 
     } catch (err) {
         showToast(err.message, 'error');
+    } finally {
+        // Always restore the button — re-render will replace it anyway
+        if (clickedBtn) {
+            clickedBtn.disabled = false;
+            clickedBtn.innerHTML = originalHTML;
+        }
     }
 
-    // Re-render the panel to reflect new state
+    // Re-render the panel immediately from the updated local cache
     const panel = document.getElementById(`org-member-panel-${orgId}`);
     if (panel) buildMemberPanel(orgId, panel);
 }
+
 
 // --- Delete Org ---
 async function deleteOrg(orgId, orgName) {
@@ -645,10 +778,97 @@ async function deleteOrg(orgId, orgName) {
     }
 }
 
+// --- Approve / Reject pending org members ---
+async function approveMember(orgId, targetUid) {
+    try {
+        const res = await fetch(`/api/orgs/${orgId}/approve/${targetUid}`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to approve member');
+
+        showToast('Member approved!', 'success');
+
+        // Invalidate and re-fetch
+        delete _memberCache[orgId];
+        const membersRes = await fetch(`/api/orgs/${orgId}/members`);
+        if (membersRes.ok) {
+            _memberCache[orgId] = (await membersRes.json()).members || [];
+        }
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+
+    const panel = document.getElementById(`org-member-panel-${orgId}`);
+    if (panel) buildMemberPanel(orgId, panel);
+}
+
+async function rejectMember(orgId, targetUid) {
+    if (!confirm('Remove this pending member from the organization?')) return;
+    try {
+        const res = await fetch(`/api/orgs/${orgId}/reject/${targetUid}`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to reject member');
+
+        showToast('Member rejected and removed.', 'success');
+
+        // Invalidate and re-fetch
+        delete _memberCache[orgId];
+        const membersRes = await fetch(`/api/orgs/${orgId}/members`);
+        if (membersRes.ok) {
+            _memberCache[orgId] = (await membersRes.json()).members || [];
+        }
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+
+    const panel = document.getElementById(`org-member-panel-${orgId}`);
+    if (panel) buildMemberPanel(orgId, panel);
+}
+
+
+// --- Request Admin Access ---
+async function requestAdminAccess(orgId) {
+    const btn = document.getElementById(`btn-request-admin-${orgId}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader-2" style="width:15px;height:15px;"></i> Sending…';
+        lucide.createIcons();
+    }
+    try {
+        const res = await fetch(`/api/orgs/${orgId}/request-admin`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+
+        // Mark in cache so re-opens show correct state
+        const members = _memberCache[orgId];
+        if (members) {
+            const me = members.find(m => m.uid === (window._currentUid || ''));
+            if (me) me.admin_requested = true;
+        }
+
+        showToast('Admin access request sent to the org owner!', 'success');
+
+        // Update button to confirmed state
+        if (btn) {
+            btn.innerHTML = '<i data-lucide="check-circle" style="width:15px;height:15px;"></i> Admin Access Requested ✓';
+            btn.style.background = '#f0fdf4';
+            btn.style.color = '#16a34a';
+            btn.style.border = '1px solid #d1fae5';
+            btn.style.cursor = 'default';
+            lucide.createIcons();
+        }
+    } catch (err) {
+        showToast(err.message, 'error');
+        if (btn) btn.disabled = false;
+    }
+}
+
 // Expose to global scope (called from inline onclick)
 window.toggleOrgCard = toggleOrgCard;
 window.setMemberRole = setMemberRole;
 window.deleteOrg = deleteOrg;
+window.approveMember = approveMember;
+window.rejectMember = rejectMember;
+window.requestAdminAccess = requestAdminAccess;
 
 // --- Update the org-switcher chip in the header ---
 function updateOrgSwitcher() {
@@ -781,6 +1001,14 @@ if (joinOrgForm) {
 
             if (data.status === 'already_member') {
                 showToast(`You're already a ${data.role} in "${data.name}"`, 'success');
+            } else if (data.status === 'pending') {
+                // Add to local org list as pending so user sees it in My Orgs
+                userOrgs.push({ id: data.org_id, name: data.name, role: 'pending' });
+                renderMyOrgsPanel();
+                updateOrgSwitcher();
+                showToast(`Request sent! Waiting for an admin to approve you in "${data.name}".`, 'success');
+                document.getElementById('org-invite-code-input').value = '';
+                switchOrgTab('my-orgs');
             } else {
                 userOrgs.push({ id: data.org_id, name: data.name, role: data.role });
                 renderMyOrgsPanel();
