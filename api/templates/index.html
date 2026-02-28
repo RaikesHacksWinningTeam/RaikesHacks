@@ -50,32 +50,25 @@
                 </div>
             </header>
 
-            <div id="floor-plan-container" class="floor-plan-container">
-                <!-- SVG will be injected here by D3 -->
+            <div id="org-dashboard-container" class="org-dashboard-container">
+                <!-- Org table will be injected here by JS -->
+                <div class="loading-state">
+                    <i data-lucide="loader-2" class="animate-spin"></i>
+                    <p>Loading organizations and events...</p>
+                </div>
             </div>
 
             <footer class="timeline-bar">
                 <div class="timeline-info">
                     <span class="timeline-title">Timeline Explorer</span>
-                    <span class="timeline-subtitle">Drag to view upcoming shifts</span>
+                    <span class="timeline-subtitle">View scheduled events</span>
                 </div>
-                <input type="range" id="timeline-slider" min="0" max="24" value="0" step="1">
                 <div class="timeline-legend">
-                    <span class="timeline-title">Next 24 Hours</span>
-                    <span class="timeline-subtitle">Real-time updates active</span>
+                    <span class="timeline-title">Real-time Dashboard</span>
+                    <span class="timeline-subtitle">Automatically updating</span>
                 </div>
             </footer>
         </main>
-
-        <aside id="side-panel" class="sidebar">
-            <div id="side-panel-empty" class="side-panel-placeholder">
-                <i data-lucide="calendar" class="placeholder-icon"></i>
-                <p>Select a room to see details</p>
-            </div>
-            <div id="side-panel-content" class="side-panel-content hidden">
-                <!-- Room details injected by JS -->
-            </div>
-        </aside>
     </div>
 
     <!-- Admin Modal -->
@@ -93,6 +86,12 @@
                     <div class="form-group">
                         <label>Event Title</label>
                         <input type="text" id="event-title" placeholder="e.g., Finals Prep Session" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Organization</label>
+                        <select id="event-org" required>
+                            <!-- Options injected by JS -->
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Room</label>
