@@ -928,8 +928,15 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .event-item {
@@ -1003,8 +1010,13 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* --- Toast notification --- */
@@ -1047,4 +1059,69 @@ input[type="range"]::-webkit-slider-thumb {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+
+/* ============================================================
+   Calendar Grid View
+   ============================================================ */
+.calendar-grid-wrapper {
+  display: grid;
+  grid-template-columns: 60px repeat(auto-fill, minmax(200px, 1fr));
+  /* 60px for time column */
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  flex: 1;
+  margin: 2rem;
+}
+
+/* Time Gutter (Left side) */
+.time-column {
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  z-index: 10;
+}
+
+.time-slot-label {
+  height: 60px;
+  /* 1 hour = 60px height */
+  font-size: 0.75rem;
+  color: #64748b;
+  text-align: center;
+  padding-top: 10px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+/* Event Container */
+.grid-column {
+  position: relative;
+  border-right: 1px solid #e2e8f0;
+  min-height: 1440px;
+  /* 24 hours * 60px */
+}
+
+/* Individual Event Box */
+.event-card {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  background: var(--secondary);
+  /* Primary brand color */
+  color: white;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 0.8rem;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.event-card:hover {
+  transform: scale(1.02);
+  z-index: 20;
 }

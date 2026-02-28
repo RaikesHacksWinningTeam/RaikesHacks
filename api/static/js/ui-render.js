@@ -25,7 +25,7 @@ export function renderDashboard(state) {
 
     if (state.allOrganizations.length === 0) {
         dashboardContainer.innerHTML = `
-            <div style="text-align: center; padding: 4rem; color: #94a3b8;">
+            <div style="text-align: center; padding: 4rem; color: #94a3b8; grid-column: 1 / -1;">
                 <i data-lucide="building-2" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
                 <p>No organizations found.</p>
             </div>`;
@@ -33,89 +33,157 @@ export function renderDashboard(state) {
         return;
     }
 
-    dashboardContainer.innerHTML = `
-        <table style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
-            <thead>
-                <tr style="text-align: left; color: #64748b; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">
-                    <th style="padding: 1rem;">Organization</th>
-                    <th style="padding: 1rem;">Events</th>
-                    <th style="padding: 1rem;">Status</th>
-                    <th style="padding: 1rem;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                ${state.allOrganizations.map(org => {
-        const orgEvents = state.events
-            .filter(e => e.org_id === org.id)
-            .sort((a, b) => new Date(a.start) - new Date(b.start));
-        const isExpanded = state.expandedOrgId === org.id;
-        const activeNow = orgEvents.some(e => {
-            const start = new Date(e.start);
-            const end = new Date(e.end);
-            return start <= state.currentTime && end >= state.currentTime;
+    dashboardContainer.innerHTML = '';
+    dashboardContainer.style.display = 'flex';
+    dashboardContainer.style.flexDirection = 'column';
+    dashboardContainer.style.overflowY = 'auto';
+    dashboardContainer.style.overflowX = 'hidden';
+
+    // Add time axis header (X axis = hours)
+    const timeAxisRow = document.createElement('div');
+    timeAxisRow.className = 'time-axis-row';
+    timeAxisRow.style.display = 'flex';
+    timeAxisRow.style.marginLeft = '180px'; // Space for org names
+    timeAxisRow.style.borderBottom = '2px solid #e2e8f0';
+    timeAxisRow.style.position = 'sticky';
+    timeAxisRow.style.top = '0';
+    timeAxisRow.style.background = '#f8fafc';
+    timeAxisRow.style.zIndex = '20';
+    timeAxisRow.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+
+    for (let i = 0; i < 24; i++) {
+        const hourLabel = document.createElement('div');
+        hourLabel.style.flex = '1';
+        hourLabel.style.textAlign = 'center';
+        hourLabel.style.fontSize = '0.75rem';
+        hourLabel.style.fontWeight = 'bold';
+        hourLabel.style.color = '#64748b';
+        hourLabel.style.padding = '0.75rem 0';
+        hourLabel.style.borderLeft = i === 0 ? 'none' : '1px solid #e2e8f0';
+        hourLabel.innerText = `${i}:00`;
+        timeAxisRow.appendChild(hourLabel);
+    }
+    dashboardContainer.appendChild(timeAxisRow);
+
+    // Rows for each Org (Y axis = orgs)
+    state.allOrganizations.forEach(org => {
+        const row = document.createElement('div');
+        row.className = 'org-timeline-row';
+        row.style.display = 'flex';
+        row.style.borderBottom = '1px solid #e2e8f0';
+        row.style.minHeight = '120px'; // Make hours block as big as possible
+        row.style.position = 'relative';
+        row.style.background = '#ffffff';
+        row.style.transition = 'background 0.2s ease';
+
+        row.onmouseenter = () => { row.style.background = '#fcfcfc'; };
+        row.onmouseleave = () => { row.style.background = '#ffffff'; };
+
+        const orgLabel = document.createElement('div');
+        orgLabel.style.width = '180px';
+        orgLabel.style.flexShrink = '0';
+        orgLabel.style.padding = '1.5rem 1rem';
+        orgLabel.style.fontWeight = '800';
+        orgLabel.style.fontSize = '1.1rem';
+        orgLabel.style.borderRight = '2px solid #e2e8f0';
+        orgLabel.style.background = '#ffffff';
+        orgLabel.style.display = 'flex';
+        orgLabel.style.alignItems = 'center';
+        orgLabel.style.justifyContent = 'center';
+        orgLabel.style.textAlign = 'center';
+        orgLabel.style.color = 'var(--primary)';
+        orgLabel.style.zIndex = '10';
+        orgLabel.innerText = org.name;
+        row.appendChild(orgLabel);
+
+        const eventsContainer = document.createElement('div');
+        eventsContainer.style.flex = '1';
+        eventsContainer.style.position = 'relative';
+        eventsContainer.style.background = 'transparent';
+
+        // Add 24-hour grid lines
+        for (let i = 0; i < 24; i++) {
+            const gridLine = document.createElement('div');
+            gridLine.style.position = 'absolute';
+            gridLine.style.left = `${(i / 24) * 100}%`;
+            gridLine.style.top = '0';
+            gridLine.style.bottom = '0';
+            gridLine.style.borderLeft = i === 0 ? 'none' : '1px dashed #e2e8f0';
+            gridLine.style.pointerEvents = 'none';
+            eventsContainer.appendChild(gridLine);
+        }
+
+        const orgEvents = state.events.filter(e => e.org_id === org.id);
+        orgEvents.forEach(event => {
+            const startDate = new Date(event.start);
+            const endDate = new Date(event.end);
+
+            const startHours = startDate.getHours() + startDate.getMinutes() / 60;
+            const endHours = endDate.getHours() + endDate.getMinutes() / 60;
+
+            const leftPercent = (startHours / 24) * 100;
+            const widthPercent = ((endHours - startHours) / 24) * 100;
+
+            const orgColor = getOrgColor(org.name || org.id);
+
+            const eventEl = document.createElement('div');
+            eventEl.className = 'event-card timeline-event';
+            eventEl.style.position = 'absolute';
+            eventEl.style.left = `calc(${leftPercent}% + 2px)`; // padding adjustment
+            eventEl.style.width = `calc(${widthPercent}% - 4px)`;
+            eventEl.style.top = '12px';
+            eventEl.style.bottom = '12px';
+            eventEl.style.backgroundColor = orgColor;
+            eventEl.style.color = 'white';
+            eventEl.style.borderRadius = '10px';
+            eventEl.style.padding = '10px 14px';
+            eventEl.style.overflow = 'hidden';
+            eventEl.style.cursor = 'pointer';
+            eventEl.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
+            eventEl.style.display = 'flex';
+            eventEl.style.flexDirection = 'column';
+            eventEl.style.justifyContent = 'center';
+            eventEl.style.transition = 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
+
+            const title = event.title;
+            const timeText = `${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${endDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+
+            eventEl.innerHTML = `
+                <div style="font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.05rem; letter-spacing: 0.02em; margin-bottom: 4px;">${title}</div>
+                <div class="time-text" style="font-size: 0.8rem; font-weight: 600; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    <i data-lucide="clock" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 2px;"></i>${timeText}
+                </div>
+            `;
+
+            eventEl.onmouseenter = () => {
+                eventEl.style.transform = 'translateY(-2px) scale(1.01)';
+                eventEl.style.boxShadow = '0 10px 20px rgba(0,0,0,0.2)';
+                eventEl.style.zIndex = '30';
+                eventEl.style.filter = 'brightness(1.1)';
+            };
+            eventEl.onmouseleave = () => {
+                eventEl.style.transform = 'translateY(0) scale(1)';
+                eventEl.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
+                eventEl.style.zIndex = '10';
+                eventEl.style.filter = 'brightness(1)';
+            };
+
+            eventEl.onclick = (e) => {
+                e.stopPropagation();
+                const myOrg = state.userOrgs.find(o => o.id === event.org_id);
+                const myRole = myOrg?.role || 'viewer';
+                if (['admin', 'owner'].includes(myRole)) {
+                    if (window.editEvent) window.editEvent(event.id);
+                }
+            };
+
+            eventsContainer.appendChild(eventEl);
         });
 
-        return `
-                        <tr onclick="window.toggleOrgExpansion('${org.id}')" style="background: white; cursor: pointer; transition: all 0.2s; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                            <td style="padding: 1rem; border-top-left-radius: 8px; border-bottom-left-radius: 8px;">
-                                <div style="display: flex; align-items: center; gap: 1rem;">
-                                    <div style="width: 32px; height: 32px; border-radius: 8px; background:${getOrgColor(org.name || org.id, org.color)}; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">${(org.name || '?')[0].toUpperCase()}</div>
-                                    <span style="font-weight: 600; color: #1e293b;">${org.name}</span>
-                                </div>
-                            </td>
-                            <td style="padding: 1rem; color: #64748b;">${orgEvents.length} scheduled</td>
-                            <td style="padding: 1rem;">
-                                ${activeNow ? '<span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">Live Now</span>' : '<span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">Inactive</span>'}
-                            </td>
-                            <td style="padding: 1rem; text-align: right; border-top-right-radius: 8px; border-bottom-right-radius: 8px;">
-                                <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" style="color: #94a3b8;"></i>
-                            </td>
-                        </tr>
-                        ${isExpanded ? `
-                            <tr>
-                                <td colspan="4" style="padding: 0 1rem 1rem 1rem;">
-                                    <div style="background: #f8fafc; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; padding: 1rem; border: 1px solid #e2e8f0; border-top: none;">
-                                        ${orgEvents.length === 0 ? '<p style="color: #94a3b8; text-align: center; padding: 1rem;">No events scheduled.</p>' : orgEvents.map(e => {
-            const room = state.rooms.find(r => r.id === e.room_id);
-            const myOrg = state.userOrgs.find(o => o.id === e.org_id);
-            const myRole = myOrg?.role || 'viewer';
-            const canEdit = ['admin', 'owner'].includes(myRole);
+        row.appendChild(eventsContainer);
+        dashboardContainer.appendChild(row);
+    });
 
-            const eventDate = e.date ? new Date(e.date + 'T00:00:00') : new Date(e.start);
-            const dateDisplay = eventDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-
-            return `
-                                                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: white; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid #e2e8f0;">
-                                                    <div style="font-size: 0.85rem; color: #64748b; width: 180px;">
-                                                        <div style="font-weight: 700; color: #1e293b;">${dateDisplay}</div>
-                                                        ${new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(e.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </div>
-                                                    <div style="flex: 1;">
-                                                        <div style="font-weight: 600; color: #1e293b;">${e.title}</div>
-                                                        <div style="font-size: 0.8rem; color: #94a3b8;"><i data-lucide="map-pin" style="width: 12px; height: 12px; display: inline-block;"></i> ${room ? room.name : 'Unknown Room'}</div>
-                                                    </div>
-                                                    <div style="display: flex; gap: 0.5rem;">
-                                                        <button onclick="event.stopPropagation(); window.openCalendarModal('${e.id}')" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;">
-                                                            <i data-lucide="calendar" style="width: 16px; height: 16px;"></i>
-                                                        </button>
-                                                        ${canEdit ? `
-                                                            <button onclick="event.stopPropagation(); window.editEvent('${e.id}')" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;">
-                                                                <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
-                                                            </button>
-                                                        ` : ''}
-                                                    </div>
-                                                </div>
-                                            `;
-        }).join('')}
-                                    </div>
-                                </td>
-                            </tr>
-                        ` : ''}
-                    `;
-    }).join('')}
-            </tbody>
-        </table>
-    `;
     if (window.lucide) window.lucide.createIcons();
 }
 
@@ -132,10 +200,10 @@ export function renderMyOrgsPanel(userOrgs) {
 
     if (userOrgs.length === 0) {
         container.innerHTML = `
-            <div class="org-empty">
+                < div class="org-empty" >
                 <i data-lucide="building-2" style="width:40px;height:40px;opacity:0.3;margin: 0 auto 0.75rem; display: block;"></i>
                 <p>You haven't joined any organizations yet.</p>
-            </div>`;
+            </div > `;
         if (window.lucide) window.lucide.createIcons();
         return;
     }
@@ -145,12 +213,13 @@ export function renderMyOrgsPanel(userOrgs) {
         const color = getOrgColor(org.name || org.id);
         const role = org.role || 'viewer';
         const canManage = ['owner', 'admin'].includes(role);
+        const isOwner = role === 'owner';
         const codeChip = org.invite_code
-            ? `<span style="font-size:0.7rem;color:#94a3b8;margin-left:0.35rem;">· <code style="color:var(--secondary);letter-spacing:0.06em;">${org.invite_code}</code></span>`
+            ? `< span style = "font-size:0.7rem;color:#94a3b8;margin-left:0.35rem;" >· <code style="color:var(--secondary);letter-spacing:0.06em;">${org.invite_code}</code></span > `
             : '';
 
         return `
-        <div class="org-card org-card-expandable" id="org-card-${org.id}" data-org-id="${org.id}">
+                < div class="org-card org-card-expandable" id = "org-card-${org.id}" data - org - id="${org.id}" >
             <div class="org-card-header" onclick="window.toggleOrgCard('${org.id}')" style="display: flex; align-items: center; gap: 1rem; width: 100%;">
                 <div class="org-avatar" style="background:${color}; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">${initial}</div>
                 <div class="org-card-info" style="flex: 1;">
@@ -183,13 +252,12 @@ export function renderMyOrgsPanel(userOrgs) {
                     </div>
                     ` : ''}
                 </div>
-                                    ` : ''}
-                                <div id="member-list-${org.id}">
-                                    <div class="member-skeleton" style="height: 50px; background: var(--surface); border-radius: 8px;"></div>
-                                </div>
-                            </div>
-                        </div>`;
-                
+                ` : ''}
+                <div id="member-list-${org.id}">
+                    <div class="member-skeleton" style="height: 50px; background: var(--surface); border-radius: 8px;"></div>
+                </div>
+            </div>
+        </div > `;
     }).join('');
     if (window.lucide) window.lucide.createIcons();
 }
@@ -211,7 +279,7 @@ export function buildMemberPanel(orgId, panel, members, userOrgs) {
         const viewerActive = (role === 'viewer' || role === 'member') ? 'active viewer' : '';
 
         return `
-        <div class="member-row" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0;">
+                < div class="member-row" style = "display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0;" >
             <div style="background:${color}; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; font-weight: 800;">${initial}</div>
             <div style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.email}${isMe ? ' (you)' : ''}</div>
             <div style="display: flex; gap: 0.25rem;">
@@ -221,6 +289,6 @@ export function buildMemberPanel(orgId, panel, members, userOrgs) {
                     : `<button class="role-pill ${viewerActive}" onclick="window.setMemberRole('${orgId}','${m.uid}','admin')" ${!canEdit || editBlocked ? 'disabled' : ''}>Grant Admin</button>`
             )}
             </div>
-        </div>`;
+        </div > `;
     }).join('');
 }
