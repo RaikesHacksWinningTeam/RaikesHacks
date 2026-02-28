@@ -14,6 +14,17 @@ export let state = {
     currentTime: new Date()
 };
 
+function updateCreateButtonVisibility() {
+    const createBtn = document.getElementById('btn-create-event');
+    if (!createBtn) return;
+    const canCreate = state.userOrgs.some(o => ['admin', 'owner'].includes(o.role));
+    if (canCreate && auth?.currentUser) {
+        createBtn.classList.remove('hidden');
+    } else {
+        createBtn.classList.add('hidden');
+    }
+}
+
 // Start clock
 const displayTimeElement = document.getElementById('display-time');
 function updateTimeDisplay() {
@@ -135,9 +146,20 @@ document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById('btn-delete-event')) {
         document.getElementById('btn-delete-event').onclick = async () => {
             const eventId = document.getElementById('event-id').value;
+            const event = state.events.find(e => e.id === eventId);
+            if (!event) return;
+
+            const myOrg = state.userOrgs.find(o => o.id === event.org_id);
+            const myRole = myOrg?.role || 'viewer';
+            if (!['admin', 'owner'].includes(myRole)) {
+                showToast("You do not have permission to delete this event.", "error");
+                return;
+            }
+
             if (confirm('Are you sure?')) {
                 await deleteDoc(doc(db, "events", eventId));
                 adminModal?.classList.add('hidden');
+                showToast("Event deleted.");
             }
         };
     }
@@ -169,10 +191,19 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             if (eventId) {
+                const event = state.events.find(e => e.id === eventId);
+                const myOrg = state.userOrgs.find(o => o.id === event?.org_id);
+                const myRole = myOrg?.role || 'viewer';
+                if (!['admin', 'owner'].includes(myRole)) {
+                    showToast("You do not have permission to edit this event.", "error");
+                    return;
+                }
                 await updateDoc(doc(db, "events", eventId), data);
+                showToast("Event updated");
             } else {
                 data.createdAt = serverTimestamp();
                 await addDoc(collection(db, "events"), data);
+                showToast("Event created");
             }
             adminModal?.classList.add('hidden');
         };
@@ -214,6 +245,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 state.userOrgs = orgData.orgs || [];
                 updateOrgSwitcher(state.userOrgs);
                 renderMyOrgsPanel(state.userOrgs);
+                updateCreateButtonVisibility();
 
                 showToast("Organization created");
             }
@@ -231,6 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 state.userOrgs = orgData.orgs || [];
                 updateOrgSwitcher(state.userOrgs);
                 renderMyOrgsPanel(state.userOrgs);
+                updateCreateButtonVisibility();
 
                 switchOrgTab('my-orgs');
                 showToast("Joined organization");
@@ -249,7 +282,6 @@ onAuthStateChanged(auth, async (user) => {
     const orgSwitcher = document.getElementById('btn-open-org-modal');
 
     if (user) {
-        createBtn?.classList.remove('hidden');
         loginLink?.classList.add('hidden');
         logoutBtn?.classList.remove('hidden');
         orgSwitcher?.classList.remove('hidden');
@@ -258,6 +290,7 @@ onAuthStateChanged(auth, async (user) => {
         state.userOrgs = data.orgs || [];
         updateOrgSwitcher(state.userOrgs);
         renderMyOrgsPanel(state.userOrgs);
+        updateCreateButtonVisibility();
     } else {
         createBtn?.classList.add('hidden');
         loginLink?.classList.remove('hidden');

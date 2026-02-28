@@ -9,7 +9,9 @@ export function editEventModal(eventId, state) {
     const eventOrgSelect = document.getElementById('event-org');
     const eventRoomSelect = document.getElementById('event-room');
 
-    if (eventOrgSelect) eventOrgSelect.innerHTML = state.allOrganizations.map(o => `<option value="${o.id}" ${o.id === event.org_id ? 'selected' : ''}>${o.name}</option>`).join('');
+    const manageableOrgs = state.userOrgs.filter(o => ['admin', 'owner'].includes(o.role));
+
+    if (eventOrgSelect) eventOrgSelect.innerHTML = manageableOrgs.map(o => `<option value="${o.id}" ${o.id === event.org_id ? 'selected' : ''}>${o.name}</option>`).join('');
     if (eventRoomSelect) eventRoomSelect.innerHTML = state.rooms.map(r => `<option value="${r.id}" ${r.id === event.room_id ? 'selected' : ''}>${r.name}</option>`).join('');
 
     const startStr = new Date(event.start).toTimeString().slice(0, 5);
@@ -17,8 +19,29 @@ export function editEventModal(eventId, state) {
     document.getElementById('event-start').value = startStr;
     document.getElementById('event-end').value = endStr;
 
+    const myRole = state.userOrgs.find(o => o.id === event.org_id)?.role || 'viewer';
+    const canEdit = ['admin', 'owner'].includes(myRole);
+
     const btnDelete = document.getElementById('btn-delete-event');
-    if (btnDelete) btnDelete.classList.remove('hidden');
+    const btnSave = document.querySelector('#event-form button[type="submit"]');
+
+    if (canEdit) {
+        if (btnDelete) btnDelete.classList.remove('hidden');
+        if (btnSave) btnSave.disabled = false;
+        eventOrgSelect.disabled = false;
+        eventRoomSelect.disabled = false;
+        document.getElementById('event-title').disabled = false;
+        document.getElementById('event-start').disabled = false;
+        document.getElementById('event-end').disabled = false;
+    } else {
+        if (btnDelete) btnDelete.classList.add('hidden');
+        if (btnSave) btnSave.disabled = true;
+        eventOrgSelect.disabled = true;
+        eventRoomSelect.disabled = true;
+        document.getElementById('event-title').disabled = true;
+        document.getElementById('event-start').disabled = true;
+        document.getElementById('event-end').disabled = true;
+    }
 
     const adminModal = document.getElementById('admin-modal');
     if (adminModal) adminModal.classList.remove('hidden');
@@ -37,8 +60,18 @@ export function createEventModal(state) {
     const btnDelete = document.getElementById('btn-delete-event');
     if (btnDelete) btnDelete.classList.add('hidden');
 
-    if (eventOrgSelect) eventOrgSelect.innerHTML = state.allOrganizations.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+    const manageableOrgs = state.userOrgs.filter(o => ['admin', 'owner'].includes(o.role));
+
+    if (eventOrgSelect) eventOrgSelect.innerHTML = manageableOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
     if (eventRoomSelect) eventRoomSelect.innerHTML = state.rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+
+    const btnSave = document.querySelector('#event-form button[type="submit"]');
+    if (btnSave) btnSave.disabled = false;
+    if (eventOrgSelect) eventOrgSelect.disabled = false;
+    if (eventRoomSelect) eventRoomSelect.disabled = false;
+    document.getElementById('event-title').disabled = false;
+    document.getElementById('event-start').disabled = false;
+    document.getElementById('event-end').disabled = false;
 
     const adminModal = document.getElementById('admin-modal');
     if (adminModal) adminModal.classList.remove('hidden');

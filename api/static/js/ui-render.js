@@ -75,7 +75,10 @@ export function renderDashboard(state) {
                                     <div style="background: #f8fafc; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; padding: 1rem; border: 1px solid #e2e8f0; border-top: none;">
                                         ${orgEvents.length === 0 ? '<p style="color: #94a3b8; text-align: center; padding: 1rem;">No events scheduled.</p>' : orgEvents.map(e => {
             const room = state.rooms.find(r => r.id === e.room_id);
-            const isLoggedIn = auth?.currentUser != null;
+            const myOrg = state.userOrgs.find(o => o.id === e.org_id);
+            const myRole = myOrg?.role || 'viewer';
+            const canEdit = ['admin', 'owner'].includes(myRole);
+
             return `
                                                 <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: white; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid #e2e8f0;">
                                                     <div style="font-size: 0.85rem; color: #64748b; width: 150px;">
@@ -89,7 +92,7 @@ export function renderDashboard(state) {
                                                         <button onclick="event.stopPropagation(); window.openCalendarModal('${e.id}')" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;">
                                                             <i data-lucide="calendar" style="width: 16px; height: 16px;"></i>
                                                         </button>
-                                                        ${isLoggedIn ? `
+                                                        ${canEdit ? `
                                                             <button onclick="event.stopPropagation(); window.editEvent('${e.id}')" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;">
                                                                 <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
                                                             </button>
