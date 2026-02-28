@@ -208,11 +208,17 @@ function updateSidePanel() {
                     <div style="font-weight: 700; color: var(--text-dark);">${e.title}</div>
                     <div style="font-size: 0.8rem; color: #64748b;">${new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(e.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     <div style="font-size: 0.8rem; margin-top: 0.5rem;">By: ${e.organizer}</div>
-                    ${isLoggedIn ? `
-                        <button onclick="editEvent('${e.id}')" style="position: absolute; top: 0.5rem; right: 0.5rem; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;" title="Edit Event">
-                            <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+                    
+                    <div style="position: absolute; top: 0.5rem; right: 0.5rem; display: flex; gap: 0.25rem;">
+                        <button onclick="openCalendarModal('${e.id}')" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;" title="Add to Calendar">
+                            <i data-lucide="calendar" style="width: 16px; height: 16px;"></i>
                         </button>
-                    ` : ''}
+                        ${isLoggedIn ? `
+                            <button onclick="editEvent('${e.id}')" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;" title="Edit Event">
+                                <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+                            </button>
+                        ` : ''}
+                    </div>
                 </div>
             `).join('')}
         </section>
@@ -220,6 +226,62 @@ function updateSidePanel() {
     lucide.createIcons();
     document.getElementById('btn-close-panel').onclick = () => selectRoom(null);
 }
+
+// --- Calendar Logic ---
+const calendarModal = document.getElementById('calendar-modal');
+const calendarLinkInput = document.getElementById('calendar-link-input');
+const btnCopyCalendarLink = document.getElementById('btn-copy-calendar-link');
+const btnCloseCalendarModal = document.getElementById('btn-close-calendar-modal');
+const btnCloseCalendarModalFooter = document.getElementById('btn-close-calendar-modal-footer');
+
+window.openCalendarModal = (eventId) => {
+    const event = events.find(e => e.id === eventId);
+    if (!event) return;
+
+    // Generate ICS content
+    const startDate = new Date(event.start).toISOString().replace(/-|:|\.\d+/g, "");
+    const endDate = new Date(event.end).toISOString().replace(/-|:|\.\d+/g, "");
+    
+    const icsContent = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//RaikesHacks2026//BuildingEvents//EN",
+        "BEGIN:VEVENT",
+        `UID:${event.id}@raikeshacks.com`,
+        `DTSTAMP:${new Date().toISOString().replace(/-|:|\.\d+/g, "")}`,
+        `DTSTART:${startDate}`,
+        `DTEND:${endDate}`,
+        `SUMMARY:${event.title}`,
+        `DESCRIPTION:Event organized by ${event.organizer}`,
+        `LOCATION:Room ID: ${event.room_id}`,
+        "END:VEVENT",
+        "END:VCALENDAR"
+    ].join("\r\n");
+
+    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    
+    calendarLinkInput.value = url;
+    calendarModal.classList.remove('hidden');
+    lucide.createIcons();
+};
+
+btnCloseCalendarModal.onclick = () => calendarModal.classList.add('hidden');
+btnCloseCalendarModalFooter.onclick = () => calendarModal.classList.add('hidden');
+calendarModal.onclick = (e) => { if (e.target === calendarModal) calendarModal.classList.add('hidden'); };
+
+btnCopyCalendarLink.onclick = () => {
+    calendarLinkInput.select();
+    navigator.clipboard.writeText(calendarLinkInput.value).then(() => {
+        const originalHtml = btnCopyCalendarLink.innerHTML;
+        btnCopyCalendarLink.innerHTML = '<i data-lucide="check" style="width: 18px; height: 18px;"></i> Copied!';
+        lucide.createIcons();
+        setTimeout(() => {
+            btnCopyCalendarLink.innerHTML = originalHtml;
+            lucide.createIcons();
+        }, 2000);
+    });
+};
 
 window.editEvent = (eventId) => {
     console.log("Editing event with ID:", eventId);

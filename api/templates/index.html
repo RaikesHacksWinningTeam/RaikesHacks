@@ -210,6 +210,36 @@
         </div>
     </div>
 
+    <!-- Calendar Modal -->
+    <div id="calendar-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add to Calendar</h2>
+                <button class="btn-close" id="btn-close-calendar-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: #64748b; font-size: 0.9rem;">
+                    Copy the link below and paste it into your calendar application (like Google Calendar, Apple Calendar, or Outlook) to add this event.
+                </p>
+                <div class="form-group">
+                    <label>Calendar Link (.ics)</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="calendar-link-input" readonly style="flex: 1; background: #f8fafc; cursor: text;">
+                        <button class="btn btn-primary" id="btn-copy-calendar-link" title="Copy to clipboard">
+                            <i data-lucide="copy" style="width: 18px; height: 18px;"></i>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btn-close-calendar-modal-footer">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase JS SDK -->
     <script>
         window.firebaseConfig = {{ firebase_config | tojson }};
