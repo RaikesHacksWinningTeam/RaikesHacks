@@ -1,23 +1,125 @@
-{% extends "layout.html" %}
-
-{% block title %}
-Login
-{% endblock %}
-
-{% block main %}
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Building Events Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .login-container {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--background);
+        }
+        .login-card {
+            background: white;
+            padding: 3rem;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        .login-header h1 {
+            font-size: 1.75rem;
+            color: var(--primary);
+            margin-bottom: 0.75rem;
+            font-weight: 800;
+        }
+        .login-header p {
+            color: #64748b;
+            margin-bottom: 2.5rem;
+            font-size: 1rem;
+        }
+        .google-btn {
+            width: 100%;
+            padding: 0.85rem;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            color: #1e293b;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .google-btn:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .google-icon {
+            width: 20px;
+            height: 20px;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 2rem;
+            color: var(--secondary);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
 <body>
-    <main class="container py-5 text-center">
-        <div>
-            <h1>Login Page</h1>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <i data-lucide="calendar" style="color: var(--secondary); width: 56px; height: 56px; margin-bottom: 1.5rem;"></i>
+                <h1>Welcome Back</h1>
+                <p>Sign in with your Google account to manage building events</p>
+            </div>
+            
+            <button id="btn-google-login" class="google-btn">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="google-icon" alt="Google">
+                Sign in with Google
+            </button>
+
+            <a href="/" class="back-link">
+                <i data-lucide="arrow-left"></i>
+                Back to Dashboard
+            </a>
         </div>
-        <div>
-            <button id="google-signin-btn">Sign in with Google</button>
-        </div>
-    </main>
-    <script>
-        window.firebaseConfig = {{ firebase_config | tojson }};
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {{ firebase_config | tojson }};
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        document.getElementById('btn-google-login').onclick = async () => {
+            try {
+                const result = await signInWithPopup(auth, provider);
+                console.log("Logged in user:", result.user.email);
+                window.location.href = "/";
+            } catch (error) {
+                console.error("Login failed:", error);
+                if (error.code !== 'auth/popup-closed-by-user') {
+                    alert("Google Login failed: " + error.message);
+                }
+            }
+        };
+
+        lucide.createIcons();
     </script>
-    <script type="module" src="{{ url_for('static', filename='js/login.js') }}" defer></script>
 </body>
-{% endblock %}
+</html>
