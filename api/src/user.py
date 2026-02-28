@@ -1,8 +1,9 @@
 from firebase_admin import firestore
+from extensions import db
 
 class User:
-    def __init__(self, db, admin_emails=None):
-        self.db = db
+    def __init__(self, db_instance=None, admin_emails=None):
+        self.db = db_instance or db
         self.collection = self.db.collection('users')
         self.admin_emails = admin_emails or []
 
