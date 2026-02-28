@@ -6,10 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Building Events Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
     <!-- CDNs -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -29,9 +25,6 @@
                         <i data-lucide="clock"></i>
                         <span id="display-time">Loading...</span>
                     </div>
-                    <button id="theme-toggle" class="btn btn-secondary" title="Toggle Dark/Light Mode" style="padding: 0.5rem;">
-                        <i data-lucide="moon" id="theme-toggle-icon"></i>
-                    </button>
                 </div>
                 <div class="header-right">
                     <button class="org-switcher hidden" id="btn-open-org-modal" title="Manage Organizations">

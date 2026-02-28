@@ -54,16 +54,16 @@ export function renderDashboard(state) {
         });
 
         return `
-                        <tr onclick="window.toggleOrgExpansion('${org.id}')" style="background: var(--background); cursor: pointer; transition: all 0.2s; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <tr onclick="window.toggleOrgExpansion('${org.id}')" style="background: white; cursor: pointer; transition: all 0.2s; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                             <td style="padding: 1rem; border-top-left-radius: 8px; border-bottom-left-radius: 8px;">
                                 <div style="display: flex; align-items: center; gap: 1rem;">
-                                    <div style="width: 32px; height: 32px; border-radius: 8px; background:${getOrgColor(org.name || org.id)}; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">${(org.name || '?')[0].toUpperCase()}</div>
-                                    <span style="font-weight: 600; color: var(--text-dark);">${org.name}</span>
+                                    <div style="width: 32px; height: 32px; border-radius: 8px; background:${getOrgColor(org.name || org.id, org.color)}; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">${(org.name || '?')[0].toUpperCase()}</div>
+                                    <span style="font-weight: 600; color: #1e293b;">${org.name}</span>
                                 </div>
                             </td>
-                            <td style="padding: 1rem; color: var(--text);">${orgEvents.length} scheduled</td>
+                            <td style="padding: 1rem; color: #64748b;">${orgEvents.length} scheduled</td>
                             <td style="padding: 1rem;">
-                                ${activeNow ? '<span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">Live Now</span>' : '<span style="background: var(--surface); color: var(--text); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">Inactive</span>'}
+                                ${activeNow ? '<span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">Live Now</span>' : '<span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">Inactive</span>'}
                             </td>
                             <td style="padding: 1rem; text-align: right; border-top-right-radius: 8px; border-bottom-right-radius: 8px;">
                                 <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" style="color: #94a3b8;"></i>
@@ -72,7 +72,7 @@ export function renderDashboard(state) {
                         ${isExpanded ? `
                             <tr>
                                 <td colspan="4" style="padding: 0 1rem 1rem 1rem;">
-                                    <div style="background: var(--surface); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; padding: 1rem; border: 1px solid var(--border); border-top: none;">
+                                    <div style="background: #f8fafc; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; padding: 1rem; border: 1px solid #e2e8f0; border-top: none;">
                                         ${orgEvents.length === 0 ? '<p style="color: #94a3b8; text-align: center; padding: 1rem;">No events scheduled.</p>' : orgEvents.map(e => {
             const room = state.rooms.find(r => r.id === e.room_id);
             const myOrg = state.userOrgs.find(o => o.id === e.org_id);
@@ -80,12 +80,12 @@ export function renderDashboard(state) {
             const canEdit = ['admin', 'owner'].includes(myRole);
 
             return `
-                                                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: var(--background); border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid var(--border);">
-                                                    <div style="font-size: 0.85rem; color: var(--text); width: 150px;">
+                                                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: white; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid #e2e8f0;">
+                                                    <div style="font-size: 0.85rem; color: #64748b; width: 150px;">
                                                         ${new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(e.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </div>
                                                     <div style="flex: 1;">
-                                                        <div style="font-weight: 600; color: var(--text-dark);">${e.title}</div>
+                                                        <div style="font-weight: 600; color: #1e293b;">${e.title}</div>
                                                         <div style="font-size: 0.8rem; color: #94a3b8;"><i data-lucide="map-pin" style="width: 12px; height: 12px; display: inline-block;"></i> ${room ? room.name : 'Unknown Room'}</div>
                                                     </div>
                                                     <div style="display: flex; gap: 0.5rem;">
@@ -157,9 +157,33 @@ export function renderMyOrgsPanel(userOrgs) {
                 <i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px; transition: transform 0.2s;"></i>
             </div>
             <div class="org-member-panel" id="org-member-panel-${org.id}" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
-                <div class="member-skeleton" style="height: 50px; background: #f1f5f9; border-radius: 8px;"></div>
-            </div>
-        </div>`;
+                ${canManage ? `
+                <div style="margin-bottom: 1.5rem; display: flex; align-items: flex-start; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #e2e8f0;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.25rem;">Brand Color</label>
+                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                            ${ORG_COLORS.map(c => `
+                                <div onclick="event.stopPropagation(); window.updateOrgColor('${org.id}', '${c}')" 
+                                     style="width: 20px; height: 20px; border-radius: 4px; background: ${c}; cursor: pointer; border: 2px solid ${c === org.color ? 'var(--primary)' : 'transparent'};">
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ${isOwner ? `
+                    <div style="flex-shrink: 0;">
+                        <button class="btn btn-alert btn-sm" onclick="event.stopPropagation(); window.deleteOrganization('${org.id}', '${org.name.replace(/'/g, "\\'")}')" style="padding: 0.3rem 0.6rem; font-size: 0.7rem;">
+                            <i data-lucide="trash-2" style="width:12px;height:12px;"></i> Delete
+                        </button>
+                    </div>
+                    ` : ''}
+                </div>
+                                    ` : ''}
+                                <div id="member-list-${org.id}">
+                                    <div class="member-skeleton" style="height: 50px; background: var(--surface); border-radius: 8px;"></div>
+                                </div>
+                            </div>
+                        </div>`;
+                
     }).join('');
     if (window.lucide) window.lucide.createIcons();
 }
