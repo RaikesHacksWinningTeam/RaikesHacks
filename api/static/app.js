@@ -4,7 +4,7 @@ const firebaseConfig = window.firebaseConfig;
 // Import Firebase SDK (Modular v10+)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, addDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signOut, getIdToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // Initialize Firebase
 let db;
@@ -548,7 +548,17 @@ async function toggleOrgCard(orgId) {
     // Fetch members only once
     if (!_memberCache[orgId]) {
         try {
-            const res = await fetch(`/api/orgs/${orgId}/members`);
+            let res = await fetch(`/api/orgs/${orgId}/members`);
+
+            // 401 = Flask session missing. Auto-refresh and retry once.
+            if (res.status === 401) {
+                console.log('Flask session missing — refreshing…');
+                const ok = await refreshFlaskSession();
+                if (ok) {
+                    res = await fetch(`/api/orgs/${orgId}/members`);
+                }
+            }
+
             if (!res.ok) throw new Error('Failed to load members');
             const data = await res.json();
             _memberCache[orgId] = data.members || [];
@@ -620,11 +630,25 @@ async function setMemberRole(orgId, targetUid, newRole, clickedBtn) {
     });
 
     try {
-        const res = await fetch(`/api/orgs/${orgId}/members`, {
+        let res = await fetch(`/api/orgs/${orgId}/members`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uid: targetUid, role: newRole })
         });
+
+        // 401 = Flask session missing. Auto-refresh and retry once.
+        if (res.status === 401) {
+            console.log('Flask session missing — refreshing…');
+            const ok = await refreshFlaskSession();
+            if (ok) {
+                res = await fetch(`/api/orgs/${orgId}/members`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uid: targetUid, role: newRole })
+                });
+            }
+        }
+
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Role update failed');
 
@@ -716,13 +740,26 @@ if (createOrgForm) {
         lucide.createIcons();
 
         try {
-            const res = await fetch('/api/orgs', {
+            let res = await fetch('/api/orgs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name })
             });
-            const data = await res.json();
 
+            // 401 = Flask session missing. Auto-refresh and retry once.
+            if (res.status === 401) {
+                console.log('Flask session missing — refreshing…');
+                const ok = await refreshFlaskSession();
+                if (ok) {
+                    res = await fetch('/api/orgs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                }
+            }
+
+            const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to create organization');
 
             // Show invite code
@@ -769,11 +806,25 @@ if (joinOrgForm) {
         lucide.createIcons();
 
         try {
-            const res = await fetch('/api/orgs/join', {
+            let res = await fetch('/api/orgs/join', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ invite_code: rawCode })
             });
+
+            // 401 = Flask session missing. Auto-refresh and retry once.
+            if (res.status === 401) {
+                console.log('Flask session missing — refreshing…');
+                const ok = await refreshFlaskSession();
+                if (ok) {
+                    res = await fetch('/api/orgs/join', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ invite_code: rawCode })
+                    });
+                }
+            }
+
             const data = await res.json();
 
             if (!res.ok) throw new Error(data.error || 'Invalid invite code');
