@@ -32,11 +32,21 @@ function format12h(hour) {
 
 function calculateLiveBarPosition() {
     const now = new Date();
-    const totalMinutes = now.getHours() * 60 + now.getMinutes();
-    const gridWidth = window.innerWidth - (PADDING * 2) - SIDEBAR_WIDTH - GAP;
+    // Only calculate position if within 6 AM (6 * 60) and 10 PM (22 * 60)
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    const startMins = 6 * 60; // 6 AM
+    const totalGridMins = 16 * 60; // 16 hours total
+
+    // Clamp so the bar stays at the edges if outside working hours
+    const visibleMins = Math.max(0, Math.min(currentMins - startMins, totalGridMins));
+
+    const container = document.getElementById('org-dashboard-container');
+    const containerWidth = container ? container.scrollWidth : window.innerWidth;
+    const gridWidth = containerWidth - (PADDING * 2) - SIDEBAR_WIDTH - GAP;
     const offset = PADDING + SIDEBAR_WIDTH + GAP;
-    const pixelPos = offset + (totalMinutes / 1440) * gridWidth;
-    return { pixelPos, totalMinutes };
+
+    const pixelPos = offset + (visibleMins / totalGridMins) * gridWidth;
+    return { pixelPos };
 }
 
 function updateLiveBar() {
@@ -44,6 +54,13 @@ function updateLiveBar() {
     if (!bar) return;
     const { pixelPos } = calculateLiveBarPosition();
     bar.style.left = `${pixelPos}px`;
+
+    // Update the time text inside
+    const span = bar.querySelector('span');
+    if (span) {
+        const now = new Date();
+        span.innerText = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
 }
 
 export function renderDashboard(state) {
@@ -83,7 +100,8 @@ export function renderDashboard(state) {
         pointer-events: none;
         z-index: 1;
     `;
-    for (let i = 0; i < 24; i++) {
+    // Background grid (16 segments for 6 AM to 10 PM)
+    for (let i = 0; i < 16; i++) {
         const line = document.createElement('div');
         line.style.cssText = `
             flex: 1;
@@ -94,18 +112,44 @@ export function renderDashboard(state) {
     }
     container.appendChild(gridOverlay);
 
-    // Live time bar
+    // Live time indicator (pill on top)
     const liveBar = document.createElement('div');
     liveBar.id = 'dashboard-live-bar';
+
+    // Get current time formatted
+    const now = new Date();
+    const timeString = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    liveBar.innerHTML = `
+        <div style="
+            position: absolute;
+            top: 24px; left: 50%;
+            width: 2px; height: 2000px;
+            background: rgba(220, 38, 38, 0.75);
+            transform: translateX(-50%);
+            box-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+            z-index: -1;
+        "></div>
+        <span>${timeString}</span>
+    `;
     liveBar.style.cssText = `
         position: absolute;
-        top: 0; bottom: 0;
-        width: 2px;
-        background: #ef4444;
-        z-index: 50;
-        box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+        top: 8px; /* sits in the time header */
+        background: #dc2626; /* darker red */
+        color: white;
+        font-size: 0.7rem;
+        font-weight: 800;
+        padding: 4px 8px;
+        border-radius: 12px;
+        z-index: 1000;
+        box-shadow: 0 4px 10px rgba(220, 38, 38, 0.4); /* drop shadow */
         pointer-events: none;
         transition: left 60s linear;
+        transform: translateX(-50%); /* Center horizontally on the line */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: auto;
     `;
     container.appendChild(liveBar);
     updateLiveBar();
@@ -125,10 +169,14 @@ export function renderDashboard(state) {
         padding-bottom: 10px;
         border-bottom: 1px solid #e2e8f0;
     `;
-    for (let i = 0; i < 24; i++) {
+    // Time header (16 segments for 6 AM to 10 PM)
+    for (let i = 0; i < 16; i++) {
         const h = document.createElement('div');
         h.style.cssText = `flex: 1; font-size: 0.7rem; font-weight: 700; color: #94a3b8; text-align: center;`;
-        h.innerText = i % 3 === 0 ? format12h(i) : '';
+
+        // Offset by 6 hours to start at 6 AM
+        const hour = i + 6;
+        h.innerText = (hour % 2 === 0) ? format12h(hour) : '';
         timeHeader.appendChild(h);
     }
     container.appendChild(timeHeader);
@@ -186,8 +234,19 @@ export function renderDashboard(state) {
             const startMins = start.getHours() * 60 + start.getMinutes();
             const endMins = end.getHours() * 60 + end.getMinutes();
 
-            const left = (startMins / 1440) * 100;
-            const width = Math.max(0.5, ((endMins - startMins) / 1440) * 100);
+            // 6 AM is our zero point
+            const gridStartMins = 6 * 60;
+            const gridTotalMins = 16 * 60;
+
+            // Constrain events visually to the grid (6am - 10pm)
+            const visibleStart = Math.max(startMins, gridStartMins);
+            const visibleEnd = Math.min(endMins, gridStartMins + gridTotalMins);
+
+            // If event is completely outside the visible window, hide it
+            const isOutside = visibleEnd <= gridStartMins || visibleStart >= gridStartMins + gridTotalMins;
+
+            const left = ((visibleStart - gridStartMins) / gridTotalMins) * 100;
+            const width = Math.max(0.5, ((visibleEnd - visibleStart) / gridTotalMins) * 100);
 
             let layerIndex = layers.findIndex(layerEnd => layerEnd <= startMins);
             if (layerIndex === -1) {
@@ -203,6 +262,7 @@ export function renderDashboard(state) {
 
             eventEl.style.cssText = `
                 position: absolute;
+                ${isOutside ? 'display: none;' : ''}
                 left: ${left}%;
                 width: ${width}%;
                 top: ${layerIndex * LAYER_SPACING}px;
