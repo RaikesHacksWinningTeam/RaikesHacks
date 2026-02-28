@@ -65,7 +65,7 @@ export function editEventModal(eventId, state) {
     if (adminModal) adminModal.classList.remove('hidden');
 }
 
-export function createEventModal(state) {
+export function createEventModal(state, defaultOrgId = null, defaultStart = '', defaultEnd = '') {
     const eventOrgSelect = document.getElementById('event-org');
     const eventRoomSelect = document.getElementById('event-room');
     const eventDateInput = document.getElementById('event-date');
@@ -73,8 +73,8 @@ export function createEventModal(state) {
     document.getElementById('modal-title').textContent = 'Create New Event';
     document.getElementById('event-id').value = '';
     document.getElementById('event-title').value = '';
-    document.getElementById('event-start').value = '';
-    document.getElementById('event-end').value = '';
+    document.getElementById('event-start').value = defaultStart;
+    document.getElementById('event-end').value = defaultEnd;
 
     const today = new Date().toISOString().split('T')[0];
     if (eventDateInput) {
@@ -87,7 +87,12 @@ export function createEventModal(state) {
 
     const manageableOrgs = state.userOrgs.filter(o => ['admin', 'owner'].includes(o.role));
 
-    if (eventOrgSelect) eventOrgSelect.innerHTML = manageableOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+    if (eventOrgSelect) {
+        eventOrgSelect.innerHTML = manageableOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+        if (defaultOrgId && manageableOrgs.some(o => o.id === defaultOrgId)) {
+            eventOrgSelect.value = defaultOrgId;
+        }
+    }
     if (eventRoomSelect) eventRoomSelect.innerHTML = state.rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
 
     const btnSave = document.querySelector('#event-form button[type="submit"]');

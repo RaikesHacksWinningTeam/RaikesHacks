@@ -53,6 +53,10 @@ window.editEvent = (eventId) => {
     editEventModal(eventId, state);
 };
 
+window.createEvent = (orgId = null, start = '', end = '') => {
+    createEventModal(state, orgId, start, end);
+};
+
 // Organization Modal Global Behaviors
 const _memberCache = {};
 window.toggleOrgCard = async (orgId) => {

@@ -292,8 +292,8 @@ export function renderDashboard(state) {
                 z-index: 60;
             `;
 
-            const startTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-            const endTime = end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            const startTime = event.start ? new Date(event.start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+            const endTime = event.end ? new Date(event.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
 
             eventEl.innerHTML = `
                 <div style="font-weight: 800; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${event.title}</div>
@@ -322,6 +322,95 @@ export function renderDashboard(state) {
 
             timelineSlot.appendChild(eventEl);
         });
+
+        // --- Drag to Create Logic ---
+        if (isAdmin) {
+            let isDragging = false;
+            let startX = 0;
+            let ghostEl = null;
+            const baseColor = getOrgColor(org.name);
+
+            timelineSlot.addEventListener('mousedown', (e) => {
+                if (e.button !== 0 || e.target !== timelineSlot) return; // Only trigger on empty slot area
+                isDragging = true;
+                const rect = timelineSlot.getBoundingClientRect();
+                startX = e.clientX - rect.left;
+
+                ghostEl = document.createElement('div');
+                ghostEl.style.cssText = `
+                    position: absolute;
+                    top: 0; bottom: 0;
+                    background: ${baseColor}33;
+                    border: 1px dashed ${baseColor};
+                    z-index: 100;
+                    pointer-events: none;
+                    border-radius: 8px;
+                `;
+                timelineSlot.appendChild(ghostEl);
+
+                const leftPct = (startX / rect.width) * 100;
+                ghostEl.style.left = `${leftPct}%`;
+                ghostEl.style.width = '0%';
+            });
+
+            timelineSlot.addEventListener('mousemove', (e) => {
+                if (!isDragging || !ghostEl) return;
+                const rect = timelineSlot.getBoundingClientRect();
+                let currentX = e.clientX - rect.left;
+                currentX = Math.max(0, Math.min(currentX, rect.width)); // Clamp bounds
+
+                const minX = Math.min(startX, currentX);
+                const maxX = Math.max(startX, currentX);
+
+                ghostEl.style.left = `${(minX / rect.width) * 100}%`;
+                ghostEl.style.width = `${((maxX - minX) / rect.width) * 100}%`;
+            });
+
+            const finishDrag = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                if (ghostEl) {
+                    const rect = timelineSlot.getBoundingClientRect();
+                    let endX = e.clientX - rect.left;
+                    endX = Math.max(0, Math.min(endX, rect.width));
+
+                    const minX = Math.min(startX, endX);
+                    const maxX = Math.max(startX, endX);
+
+                    const gridStartMins = 6 * 60;
+                    const gridTotalMins = 16 * 60;
+
+                    const openModal = (startMins, endMins) => {
+                        const roundTo15 = (m) => Math.round(m / 15) * 15;
+                        const finalStart = roundTo15(startMins);
+                        const finalEnd = roundTo15(endMins);
+
+                        const sStr = `${String(Math.floor(finalStart / 60)).padStart(2, '0')}:${String(finalStart % 60).padStart(2, '0')}`;
+                        const eStr = `${String(Math.floor(finalEnd / 60)).padStart(2, '0')}:${String(finalEnd % 60).padStart(2, '0')}`;
+
+                        if (window.createEvent) window.createEvent(org.id, sStr, eStr);
+                    };
+
+                    if (maxX - minX < 5) {
+                        // Regular Click - Snap to nearest 30 min block, default 1 hour length
+                        const clickMins = (minX / rect.width) * gridTotalMins;
+                        const snappedMins = Math.floor(clickMins / 30) * 30;
+                        openModal(gridStartMins + snappedMins, gridStartMins + snappedMins + 60);
+                    } else {
+                        // Real Drag
+                        const startMins = gridStartMins + (minX / rect.width) * gridTotalMins;
+                        const endMins = gridStartMins + (maxX / rect.width) * gridTotalMins;
+                        openModal(startMins, endMins);
+                    }
+
+                    ghostEl.remove();
+                    ghostEl = null;
+                }
+            };
+
+            timelineSlot.addEventListener('mouseup', finishDrag);
+            timelineSlot.addEventListener('mouseleave', finishDrag);
+        }
 
         timelineSlot.style.height = `${Math.max(EVENT_HEIGHT + 5, layers.length * LAYER_SPACING)}px`;
         container.appendChild(timelineSlot);
