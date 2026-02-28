@@ -2,7 +2,10 @@ export function editEventModal(eventId, state) {
     const event = state.events.find(e => e.id === eventId);
     if (!event) return;
 
-    document.getElementById('modal-title').textContent = 'Edit Event';
+    const myRole = state.userOrgs.find(o => o.id === event.org_id)?.role || 'viewer';
+    const canEdit = ['admin', 'owner'].includes(myRole);
+
+    document.getElementById('modal-title').textContent = canEdit ? 'Edit Event' : 'Event Details';
     document.getElementById('event-id').value = event.id;
     document.getElementById('event-title').value = event.title;
 
@@ -12,20 +15,28 @@ export function editEventModal(eventId, state) {
 
     const manageableOrgs = state.userOrgs.filter(o => ['admin', 'owner'].includes(o.role));
 
-    if (eventOrgSelect) eventOrgSelect.innerHTML = manageableOrgs.map(o => `<option value="${o.id}" ${o.id === event.org_id ? 'selected' : ''}>${o.name}</option>`).join('');
+    // In read-only mode, the organization might not be in manageableOrgs
+    const options = manageableOrgs.slice();
+    if (!options.find(o => o.id === event.org_id)) {
+        const viewOnlyOrg = state.allOrganizations.find(o => o.id === event.org_id);
+        if (viewOnlyOrg) {
+            options.push(viewOnlyOrg);
+        }
+    }
+
+    if (eventOrgSelect) eventOrgSelect.innerHTML = options.map(o => `<option value="${o.id}" ${o.id === event.org_id ? 'selected' : ''}>${o.name}</option>`).join('');
     if (eventRoomSelect) eventRoomSelect.innerHTML = state.rooms.map(r => `<option value="${r.id}" ${r.id === event.room_id ? 'selected' : ''}>${r.name}</option>`).join('');
 
     const eventStartDate = new Date(event.start);
     const dateStr = eventStartDate.toISOString().split('T')[0];
     const startStr = eventStartDate.toTimeString().slice(0, 5);
     const endStr = new Date(event.end).toTimeString().slice(0, 5);
-    
+
     if (eventDateInput) eventDateInput.value = dateStr;
     document.getElementById('event-start').value = startStr;
     document.getElementById('event-end').value = endStr;
 
-    const myRole = state.userOrgs.find(o => o.id === event.org_id)?.role || 'viewer';
-    const canEdit = ['admin', 'owner'].includes(myRole);
+    // myRole and canEdit already evaluated above
 
     const btnDelete = document.getElementById('btn-delete-event');
     const btnSave = document.querySelector('#event-form button[type="submit"]');
@@ -64,7 +75,7 @@ export function createEventModal(state) {
     document.getElementById('event-title').value = '';
     document.getElementById('event-start').value = '';
     document.getElementById('event-end').value = '';
-    
+
     const today = new Date().toISOString().split('T')[0];
     if (eventDateInput) {
         eventDateInput.value = today;

@@ -1,0 +1,37 @@
+/* Custom Scrollbar for the Bento Look */
+#org-dashboard-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+#org-dashboard-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+/* Glassmorphism focus */
+.event-card {
+    box-sizing: border-box;
+}
+
+/* Prevent text selection during wiggle */
+.event-card div {
+    user-select: none;
+    pointer-events: none;
+}
+
+
+#dashboard-live-bar {
+    will-change: left;
+}
+
+.event-card {
+    will-change: transform, z-index;
+}
+
+.org-card {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.org-card:last-child {
+    border-bottom: none;
+}

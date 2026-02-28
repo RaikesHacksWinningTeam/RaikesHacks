@@ -86,6 +86,12 @@ window.setMemberRole = async (orgId, uid, role) => {
             // Refresh inline
             document.querySelectorAll('.org-member-panel').forEach(p => p.style.display = 'none');
             window.toggleOrgCard(orgId);
+
+            // Re-fetch user orgs in case the user changed their own role or it affects the dashboard UI
+            const orgData = await fetchUserOrgs();
+            state.userOrgs = orgData.orgs || [];
+            renderDashboard(state);
+
             showToast("Role updated");
         }
     } catch (e) { console.error(e); }
@@ -249,6 +255,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 updateOrgSwitcher(state.userOrgs);
                 renderMyOrgsPanel(state.userOrgs);
                 updateCreateButtonVisibility();
+                renderDashboard(state);
 
                 showToast("Organization created");
             }
@@ -267,6 +274,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 updateOrgSwitcher(state.userOrgs);
                 renderMyOrgsPanel(state.userOrgs);
                 updateCreateButtonVisibility();
+                renderDashboard(state);
 
                 switchOrgTab('my-orgs');
                 showToast("Joined organization");
@@ -418,6 +426,7 @@ onAuthStateChanged(auth, async (user) => {
         updateOrgSwitcher(state.userOrgs);
         renderMyOrgsPanel(state.userOrgs);
         updateCreateButtonVisibility();
+        renderDashboard(state);
     } else {
         createBtn?.classList.add('hidden');
         loginLink?.classList.remove('hidden');

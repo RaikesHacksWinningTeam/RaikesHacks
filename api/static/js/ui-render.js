@@ -1,6 +1,11 @@
 import { auth } from './firebase-config.js';
 
 const ORG_COLORS = ['#635bff', '#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
+const EVENT_HEIGHT = 120;
+const LAYER_SPACING = 130;
+const SIDEBAR_WIDTH = 180;
+const GAP = 12;
+const PADDING = 20;
 
 export function getOrgColor(name) {
     let hash = 0;
@@ -19,13 +24,35 @@ export function showToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 3500);
 }
 
+function format12h(hour) {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const h = hour % 12 || 12;
+    return `${h} ${period}`;
+}
+
+function calculateLiveBarPosition() {
+    const now = new Date();
+    const totalMinutes = now.getHours() * 60 + now.getMinutes();
+    const gridWidth = window.innerWidth - (PADDING * 2) - SIDEBAR_WIDTH - GAP;
+    const offset = PADDING + SIDEBAR_WIDTH + GAP;
+    const pixelPos = offset + (totalMinutes / 1440) * gridWidth;
+    return { pixelPos, totalMinutes };
+}
+
+function updateLiveBar() {
+    const bar = document.getElementById('dashboard-live-bar');
+    if (!bar) return;
+    const { pixelPos } = calculateLiveBarPosition();
+    bar.style.left = `${pixelPos}px`;
+}
+
 export function renderDashboard(state) {
-    const dashboardContainer = document.getElementById('org-dashboard-container');
-    if (!dashboardContainer) return;
+    const container = document.getElementById('org-dashboard-container');
+    if (!container) return;
 
     if (state.allOrganizations.length === 0) {
-        dashboardContainer.innerHTML = `
-            <div style="text-align: center; padding: 4rem; color: #94a3b8; grid-column: 1 / -1;">
+        container.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 4rem; color: #94a3b8;">
                 <i data-lucide="building-2" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
                 <p>No organizations found.</p>
             </div>`;
@@ -33,155 +60,203 @@ export function renderDashboard(state) {
         return;
     }
 
-    dashboardContainer.innerHTML = '';
-    dashboardContainer.style.display = 'flex';
-    dashboardContainer.style.flexDirection = 'column';
-    dashboardContainer.style.overflowY = 'auto';
-    dashboardContainer.style.overflowX = 'hidden';
+    container.style.cssText = `
+        display: grid;
+        grid-template-columns: ${SIDEBAR_WIDTH}px 1fr;
+        gap: ${GAP}px;
+        padding: ${PADDING}px;
+        background: #f8fafc;
+        position: relative;
+        overflow-y: auto;
+    `;
+    container.innerHTML = '';
 
-    // Add time axis header (X axis = hours)
-    const timeAxisRow = document.createElement('div');
-    timeAxisRow.className = 'time-axis-row';
-    timeAxisRow.style.display = 'flex';
-    timeAxisRow.style.marginLeft = '180px'; // Space for org names
-    timeAxisRow.style.borderBottom = '2px solid #e2e8f0';
-    timeAxisRow.style.position = 'sticky';
-    timeAxisRow.style.top = '0';
-    timeAxisRow.style.background = '#f8fafc';
-    timeAxisRow.style.zIndex = '20';
-    timeAxisRow.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+    const timelineOffset = PADDING + SIDEBAR_WIDTH + GAP;
 
+    // Background grid
+    const gridOverlay = document.createElement('div');
+    gridOverlay.id = 'dashboard-grid-overlay';
+    gridOverlay.style.cssText = `
+        position: absolute;
+        top: 0; left: ${timelineOffset}px; right: ${PADDING}px; bottom: 0;
+        display: flex;
+        pointer-events: none;
+        z-index: 1;
+    `;
     for (let i = 0; i < 24; i++) {
-        const hourLabel = document.createElement('div');
-        hourLabel.style.flex = '1';
-        hourLabel.style.textAlign = 'center';
-        hourLabel.style.fontSize = '0.75rem';
-        hourLabel.style.fontWeight = 'bold';
-        hourLabel.style.color = '#64748b';
-        hourLabel.style.padding = '0.75rem 0';
-        hourLabel.style.borderLeft = i === 0 ? 'none' : '1px solid #e2e8f0';
-        hourLabel.innerText = `${i}:00`;
-        timeAxisRow.appendChild(hourLabel);
+        const line = document.createElement('div');
+        line.style.cssText = `
+            flex: 1;
+            border-left: 1px dashed rgba(226, 232, 240, 0.8);
+            height: 100%;
+        `;
+        gridOverlay.appendChild(line);
     }
-    dashboardContainer.appendChild(timeAxisRow);
+    container.appendChild(gridOverlay);
 
-    // Rows for each Org (Y axis = orgs)
+    // Live time bar
+    const liveBar = document.createElement('div');
+    liveBar.id = 'dashboard-live-bar';
+    liveBar.style.cssText = `
+        position: absolute;
+        top: 0; bottom: 0;
+        width: 2px;
+        background: #ef4444;
+        z-index: 50;
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+        pointer-events: none;
+        transition: left 60s linear;
+    `;
+    container.appendChild(liveBar);
+    updateLiveBar();
+
+    // Time header
+    const spacer = document.createElement('div');
+    container.appendChild(spacer);
+
+    const timeHeader = document.createElement('div');
+    timeHeader.style.cssText = `
+        display: flex;
+        position: sticky;
+        top: 0;
+        z-index: 110;
+        background: rgba(248, 250, 252, 0.95);
+        backdrop-filter: blur(4px);
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e2e8f0;
+    `;
+    for (let i = 0; i < 24; i++) {
+        const h = document.createElement('div');
+        h.style.cssText = `flex: 1; font-size: 0.7rem; font-weight: 700; color: #94a3b8; text-align: center;`;
+        h.innerText = i % 3 === 0 ? format12h(i) : '';
+        timeHeader.appendChild(h);
+    }
+    container.appendChild(timeHeader);
+
+    // Live bar update
+    if (!window._liveBarInterval) {
+        window._liveBarInterval = setInterval(updateLiveBar, 60000);
+    }
+
+    // Render org rows
     state.allOrganizations.forEach(org => {
-        const row = document.createElement('div');
-        row.className = 'org-timeline-row';
-        row.style.display = 'flex';
-        row.style.borderBottom = '1px solid #e2e8f0';
-        row.style.minHeight = '120px'; // Make hours block as big as possible
-        row.style.position = 'relative';
-        row.style.background = '#ffffff';
-        row.style.transition = 'background 0.2s ease';
+        const myOrgEntry = state.userOrgs.find(o => o.id === org.id);
+        const isAdmin = myOrgEntry && ['admin', 'owner'].includes(myOrgEntry.role);
+        const hasAccess = !!myOrgEntry;
 
-        row.onmouseenter = () => { row.style.background = '#fcfcfc'; };
-        row.onmouseleave = () => { row.style.background = '#ffffff'; };
-
+        // Sidebar label
         const orgLabel = document.createElement('div');
-        orgLabel.style.width = '180px';
-        orgLabel.style.flexShrink = '0';
-        orgLabel.style.padding = '1.5rem 1rem';
-        orgLabel.style.fontWeight = '800';
-        orgLabel.style.fontSize = '1.1rem';
-        orgLabel.style.borderRight = '2px solid #e2e8f0';
-        orgLabel.style.background = '#ffffff';
-        orgLabel.style.display = 'flex';
-        orgLabel.style.alignItems = 'center';
-        orgLabel.style.justifyContent = 'center';
-        orgLabel.style.textAlign = 'center';
-        orgLabel.style.color = 'var(--primary)';
-        orgLabel.style.zIndex = '10';
+        orgLabel.style.cssText = `
+            font-weight: 800;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            font-size: 0.95rem;
+            z-index: 2;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        `;
         orgLabel.innerText = org.name;
-        row.appendChild(orgLabel);
+        container.appendChild(orgLabel);
 
-        const eventsContainer = document.createElement('div');
-        eventsContainer.style.flex = '1';
-        eventsContainer.style.position = 'relative';
-        eventsContainer.style.background = 'transparent';
-
-        // Add 24-hour grid lines
-        for (let i = 0; i < 24; i++) {
-            const gridLine = document.createElement('div');
-            gridLine.style.position = 'absolute';
-            gridLine.style.left = `${(i / 24) * 100}%`;
-            gridLine.style.top = '0';
-            gridLine.style.bottom = '0';
-            gridLine.style.borderLeft = i === 0 ? 'none' : '1px dashed #e2e8f0';
-            gridLine.style.pointerEvents = 'none';
-            eventsContainer.appendChild(gridLine);
-        }
+        // Timeline slot with admin styling
+        const timelineSlot = document.createElement('div');
+        timelineSlot.style.cssText = `
+            position: relative;
+            min-height: ${EVENT_HEIGHT + 5}px;
+            z-index: 5;
+            border-bottom: 1px solid #e2e8f0;
+            ${hasAccess ? `
+                background: linear-gradient(90deg, rgba(99,91,255,0.03) 0%, transparent 100%);
+            ` : ''}
+            ${isAdmin ? `
+                border-left: 3px solid rgba(99,91,255,0.4);
+                padding-left: 8px;
+            ` : ''}
+        `;
 
         const orgEvents = state.events.filter(e => e.org_id === org.id);
+        orgEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
+        let layers = [];
+
         orgEvents.forEach(event => {
-            const startDate = new Date(event.start);
-            const endDate = new Date(event.end);
+            const start = new Date(event.start);
+            const end = new Date(event.end);
+            const startMins = start.getHours() * 60 + start.getMinutes();
+            const endMins = end.getHours() * 60 + end.getMinutes();
 
-            const startHours = startDate.getHours() + startDate.getMinutes() / 60;
-            const endHours = endDate.getHours() + endDate.getMinutes() / 60;
+            const left = (startMins / 1440) * 100;
+            const width = Math.max(0.5, ((endMins - startMins) / 1440) * 100);
 
-            const leftPercent = (startHours / 24) * 100;
-            const widthPercent = ((endHours - startHours) / 24) * 100;
-
-            const orgColor = getOrgColor(org.name || org.id);
+            let layerIndex = layers.findIndex(layerEnd => layerEnd <= startMins);
+            if (layerIndex === -1) {
+                layerIndex = layers.length;
+                layers.push(endMins);
+            } else {
+                layers[layerIndex] = endMins;
+            }
 
             const eventEl = document.createElement('div');
-            eventEl.className = 'event-card timeline-event';
-            eventEl.style.position = 'absolute';
-            eventEl.style.left = `calc(${leftPercent}% + 2px)`; // padding adjustment
-            eventEl.style.width = `calc(${widthPercent}% - 4px)`;
-            eventEl.style.top = '12px';
-            eventEl.style.bottom = '12px';
-            eventEl.style.backgroundColor = orgColor;
-            eventEl.style.color = 'white';
-            eventEl.style.borderRadius = '10px';
-            eventEl.style.padding = '10px 14px';
-            eventEl.style.overflow = 'hidden';
-            eventEl.style.cursor = 'pointer';
-            eventEl.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-            eventEl.style.display = 'flex';
-            eventEl.style.flexDirection = 'column';
-            eventEl.style.justifyContent = 'center';
-            eventEl.style.transition = 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            eventEl.classList.add('event-card');
+            const baseColor = getOrgColor(org.name);
 
-            const title = event.title;
-            const timeText = `${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${endDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+            eventEl.style.cssText = `
+                position: absolute;
+                left: ${left}%;
+                width: ${width}%;
+                top: ${layerIndex * LAYER_SPACING}px;
+                height: ${EVENT_HEIGHT}px;
+                background: ${baseColor}cc;
+                backdrop-filter: blur(8px);
+                border: 1px solid rgba(255,255,255,0.2);
+                border-radius: 12px;
+                padding: 12px 16px;
+                color: white;
+                cursor: pointer;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                transition: all 0.3s ease;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-start;
+                gap: 4px;
+                z-index: 60;
+            `;
+
+            const startTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            const endTime = end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
             eventEl.innerHTML = `
-                <div style="font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.05rem; letter-spacing: 0.02em; margin-bottom: 4px;">${title}</div>
-                <div class="time-text" style="font-size: 0.8rem; font-weight: 600; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    <i data-lucide="clock" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 2px;"></i>${timeText}
-                </div>
+                <div style="font-weight: 800; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${event.title}</div>
+                <div style="font-size: 0.75rem; font-weight: 600; opacity: 0.9;">${startTime} - ${endTime}</div>
             `;
 
             eventEl.onmouseenter = () => {
-                eventEl.style.transform = 'translateY(-2px) scale(1.01)';
-                eventEl.style.boxShadow = '0 10px 20px rgba(0,0,0,0.2)';
-                eventEl.style.zIndex = '30';
-                eventEl.style.filter = 'brightness(1.1)';
+                eventEl.style.transform = 'scale(1.02) translateY(-2px)';
+                eventEl.style.zIndex = '200';
+                eventEl.style.background = baseColor;
+                eventEl.style.boxShadow = '0 12px 30px rgba(0,0,0,0.2)';
             };
             eventEl.onmouseleave = () => {
-                eventEl.style.transform = 'translateY(0) scale(1)';
-                eventEl.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-                eventEl.style.zIndex = '10';
-                eventEl.style.filter = 'brightness(1)';
+                eventEl.style.transform = 'scale(1) translateY(0)';
+                eventEl.style.zIndex = '60';
+                eventEl.style.background = baseColor + 'cc';
+                eventEl.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
             };
 
             eventEl.onclick = (e) => {
                 e.stopPropagation();
-                const myOrg = state.userOrgs.find(o => o.id === event.org_id);
-                const myRole = myOrg?.role || 'viewer';
-                if (['admin', 'owner'].includes(myRole)) {
-                    if (window.editEvent) window.editEvent(event.id);
+                if (window.editEvent) {
+                    window.editEvent(event.id);
                 }
             };
 
-            eventsContainer.appendChild(eventEl);
+            timelineSlot.appendChild(eventEl);
         });
 
-        row.appendChild(eventsContainer);
-        dashboardContainer.appendChild(row);
+        timelineSlot.style.height = `${Math.max(EVENT_HEIGHT + 5, layers.length * LAYER_SPACING)}px`;
+        container.appendChild(timelineSlot);
     });
 
     if (window.lucide) window.lucide.createIcons();
@@ -200,10 +275,10 @@ export function renderMyOrgsPanel(userOrgs) {
 
     if (userOrgs.length === 0) {
         container.innerHTML = `
-                < div class="org-empty" >
+            <div class="org-empty">
                 <i data-lucide="building-2" style="width:40px;height:40px;opacity:0.3;margin: 0 auto 0.75rem; display: block;"></i>
                 <p>You haven't joined any organizations yet.</p>
-            </div > `;
+            </div>`;
         if (window.lucide) window.lucide.createIcons();
         return;
     }
@@ -215,49 +290,49 @@ export function renderMyOrgsPanel(userOrgs) {
         const canManage = ['owner', 'admin'].includes(role);
         const isOwner = role === 'owner';
         const codeChip = org.invite_code
-            ? `< span style = "font-size:0.7rem;color:#94a3b8;margin-left:0.35rem;" >· <code style="color:var(--secondary);letter-spacing:0.06em;">${org.invite_code}</code></span > `
+            ? `<span style="font-size:0.7rem;color:#94a3b8;margin-left:0.35rem;">· <code style="color:var(--secondary);letter-spacing:0.06em;">${org.invite_code}</code></span>`
             : '';
 
         return `
-                < div class="org-card org-card-expandable" id = "org-card-${org.id}" data - org - id="${org.id}" >
-            <div class="org-card-header" onclick="window.toggleOrgCard('${org.id}')" style="display: flex; align-items: center; gap: 1rem; width: 100%;">
-                <div class="org-avatar" style="background:${color}; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">${initial}</div>
-                <div class="org-card-info" style="flex: 1;">
-                    <div class="org-card-name" style="font-weight: 700;">${org.name}${codeChip}</div>
-                    <div class="org-card-role" id="org-member-count-${org.id}" style="font-size: 0.75rem; color: #94a3b8;">
-                        ${canManage ? 'Manage members' : 'View members'}
-                    </div>
-                </div>
-                <span class="role-badge ${role}">${role}</span>
-                <i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px; transition: transform 0.2s;"></i>
-            </div>
-            <div class="org-member-panel" id="org-member-panel-${org.id}" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
-                ${canManage ? `
-                <div style="margin-bottom: 1.5rem; display: flex; align-items: flex-start; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #e2e8f0;">
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.25rem;">Brand Color</label>
-                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                            ${ORG_COLORS.map(c => `
-                                <div onclick="event.stopPropagation(); window.updateOrgColor('${org.id}', '${c}')" 
-                                     style="width: 20px; height: 20px; border-radius: 4px; background: ${c}; cursor: pointer; border: 2px solid ${c === org.color ? 'var(--primary)' : 'transparent'};">
-                                </div>
-                            `).join('')}
+            <div class="org-card org-card-expandable" id="org-card-${org.id}" data-org-id="${org.id}">
+                <div class="org-card-header" onclick="window.toggleOrgCard('${org.id}')" style="display: flex; align-items: center; gap: 1rem; width: 100%;">
+                    <div class="org-avatar" style="background:${color}; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">${initial}</div>
+                    <div class="org-card-info" style="flex: 1;">
+                        <div class="org-card-name" style="font-weight: 700;">${org.name}${codeChip}</div>
+                        <div class="org-card-role" id="org-member-count-${org.id}" style="font-size: 0.75rem; color: #94a3b8;">
+                            ${canManage ? 'Manage members' : 'View members'}
                         </div>
                     </div>
-                    ${isOwner ? `
-                    <div style="flex-shrink: 0;">
-                        <button class="btn btn-alert btn-sm" onclick="event.stopPropagation(); window.deleteOrganization('${org.id}', '${org.name.replace(/'/g, "\\'")}')" style="padding: 0.3rem 0.6rem; font-size: 0.7rem;">
-                            <i data-lucide="trash-2" style="width:12px;height:12px;"></i> Delete
-                        </button>
+                    <span class="role-badge ${role}">${role}</span>
+                    <i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px; transition: transform 0.2s;"></i>
+                </div>
+                <div class="org-member-panel" id="org-member-panel-${org.id}" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+                    ${canManage ? `
+                    <div style="margin-bottom: 1.5rem; display: flex; align-items: flex-start; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #e2e8f0;">
+                        <div style="flex: 1;">
+                            <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.25rem;">Brand Color</label>
+                            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                                ${ORG_COLORS.map(c => `
+                                    <div onclick="event.stopPropagation(); window.updateOrgColor('${org.id}', '${c}')" 
+                                         style="width: 20px; height: 20px; border-radius: 4px; background: ${c}; cursor: pointer; border: 2px solid ${c === org.color ? 'var(--primary)' : 'transparent'};">
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ${isOwner ? `
+                        <div style="flex-shrink: 0;">
+                            <button class="btn btn-alert btn-sm" onclick="event.stopPropagation(); window.deleteOrganization('${org.id}', '${org.name.replace(/'/g, "\\'")}')" style="padding: 0.3rem 0.6rem; font-size: 0.7rem;">
+                                <i data-lucide="trash-2" style="width:12px;height:12px;"></i> Delete
+                            </button>
+                        </div>
+                        ` : ''}
                     </div>
                     ` : ''}
+                    <div id="member-list-${org.id}">
+                        <div class="member-skeleton" style="height: 50px; background: var(--surface); border-radius: 8px;"></div>
+                    </div>
                 </div>
-                ` : ''}
-                <div id="member-list-${org.id}">
-                    <div class="member-skeleton" style="height: 50px; background: var(--surface); border-radius: 8px;"></div>
-                </div>
-            </div>
-        </div > `;
+            </div>`;
     }).join('');
     if (window.lucide) window.lucide.createIcons();
 }
@@ -279,16 +354,16 @@ export function buildMemberPanel(orgId, panel, members, userOrgs) {
         const viewerActive = (role === 'viewer' || role === 'member') ? 'active viewer' : '';
 
         return `
-                < div class="member-row" style = "display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0;" >
-            <div style="background:${color}; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; font-weight: 800;">${initial}</div>
-            <div style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.email}${isMe ? ' (you)' : ''}</div>
-            <div style="display: flex; gap: 0.25rem;">
-                ${isOwner ? '<span class="role-pill active owner">Owner</span>' : (
+            <div class="member-row" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0;">
+                <div style="background:${color}; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; font-weight: 800;">${initial}</div>
+                <div style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.email}${isMe ? ' (you)' : ''}</div>
+                <div style="display: flex; gap: 0.25rem;">
+                    ${isOwner ? '<span class="role-pill active owner">Owner</span>' : (
                 role === 'admin'
                     ? `<button class="role-pill ${adminActive}" onclick="window.setMemberRole('${orgId}','${m.uid}','viewer')" ${!canEdit || editBlocked ? 'disabled' : ''}>Revoke Admin</button>`
                     : `<button class="role-pill ${viewerActive}" onclick="window.setMemberRole('${orgId}','${m.uid}','admin')" ${!canEdit || editBlocked ? 'disabled' : ''}>Grant Admin</button>`
             )}
-            </div>
-        </div > `;
+                </div>
+            </div>`;
     }).join('');
 }
