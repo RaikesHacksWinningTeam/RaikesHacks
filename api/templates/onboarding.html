@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome - Getting Started</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .onboarding-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8fafc;
+            padding: 2rem;
+        }
+        .onboarding-card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        .welcome-icon {
+            width: 64px;
+            height: 64px;
+            color: var(--primary);
+            background: #eff6ff;
+            padding: 1rem;
+            border-radius: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .onboarding-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+        .onboarding-subtitle {
+            color: #64748b;
+            margin-bottom: 2rem;
+        }
+        .onboarding-options {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .onboarding-option-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            position: relative;
+        }
+        .onboarding-option-card:hover {
+            border-color: var(--primary);
+            background: #f0f7ff;
+        }
+        .onboarding-option-card.active {
+            border-color: var(--primary);
+            background: #eff6ff;
+        }
+        .option-title {
+            font-weight: 600;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .option-desc {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+        .onboarding-input-group {
+            margin-top: 1rem;
+            display: none;
+        }
+        .onboarding-input-group.show {
+            display: block;
+        }
+        .onboarding-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: opacity 0.2s;
+        }
+        .btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .error-msg {
+            color: var(--error);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            background: #1e293b;
+            color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            transform: translateY(100px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+        .toast.show { transform: translateY(0); }
+    </style>
+</head>
+<body>
+    <div class="onboarding-container">
+        <div class="onboarding-card">
+            <i data-lucide="sparkles" class="welcome-icon"></i>
+            <h1 class="onboarding-title">Welcome!</h1>
+            <p class="onboarding-subtitle">To get started, you'll need to join or create an organization.</p>
+
+            <div class="onboarding-options">
+                <div class="onboarding-option-card" id="option-join">
+                    <div class="option-title"><i data-lucide="log-in" style="width:18px;"></i> Join an Organization</div>
+                    <p class="option-desc">Enter an invite code from your administrator.</p>
+                    <div class="onboarding-input-group" id="group-join">
+                        <input type="text" id="invite-code-input" class="onboarding-input" placeholder="ABC-123" maxlength="10">
+                    </div>
+                </div>
+
+                <div class="onboarding-option-card" id="option-create">
+                    <div class="option-title"><i data-lucide="plus-circle" style="width:18px;"></i> Create New Organization</div>
+                    <p class="option-desc">Start your own organization for your building.</p>
+                    <div class="onboarding-input-group" id="group-create">
+                        <input type="text" id="org-name-input" class="onboarding-input" placeholder="e.g. My Building Name">
+                    </div>
+                </div>
+
+                <button id="btn-submit" class="btn-submit" disabled>
+                    Continue <i data-lucide="arrow-right" style="width:18px;"></i>
+                </button>
+                <div id="error-display" class="error-msg"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, getIdToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        // Config from Flask
+        const firebaseConfig = {{ firebase_config | tojson }};
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        lucide.createIcons();
+
+        let mode = null; // 'join' or 'create'
+
+        const optJoin = document.getElementById('option-join');
+        const optCreate = document.getElementById('option-create');
+        const groupJoin = document.getElementById('group-join');
+        const groupCreate = document.getElementById('group-create');
+        const btnSubmit = document.getElementById('btn-submit');
+        const inviteInput = document.getElementById('invite-code-input');
+        const nameInput = document.getElementById('org-name-input');
+        const errorDisplay = document.getElementById('error-display');
+
+        function selectMode(newMode) {
+            mode = newMode;
+            optJoin.classList.toggle('active', mode === 'join');
+            optCreate.classList.toggle('active', mode === 'create');
+            groupJoin.classList.toggle('show', mode === 'join');
+            groupCreate.classList.toggle('show', mode === 'create');
+            btnSubmit.disabled = false;
+            errorDisplay.style.display = 'none';
+        }
+
+        optJoin.onclick = () => selectMode('join');
+        optCreate.onclick = () => selectMode('create');
+
+        btnSubmit.onclick = async () => {
+            const val = mode === 'join' ? inviteInput.value.trim() : nameInput.value.trim();
+            if (!val) {
+                showError(`Please enter a ${mode === 'join' ? 'code' : 'name'}.`);
+                return;
+            }
+
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Processing...';
+            lucide.createIcons();
+
+            try {
+                const endpoint = mode === 'join' ? '/api/orgs/join' : '/api/orgs';
+                const body = mode === 'join' ? { invite_code: val } : { name: val };
+
+                let res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (res.status === 401) {
+                    // Refresh session if needed
+                    const user = auth.currentUser;
+                    if (user) {
+                        const token = await getIdToken(user, true);
+                        await fetch('/api/auth/google', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ idToken: token })
+                        });
+                        res = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                    }
+                }
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Operation failed');
+
+                window.location.href = '/';
+
+            } catch (err) {
+                showError(err.message);
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = 'Continue <i data-lucide="arrow-right" style="width:18px;"></i>';
+                lucide.createIcons();
+            }
+        };
+
+        function showError(msg) {
+            errorDisplay.textContent = msg;
+            errorDisplay.style.display = 'block';
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>

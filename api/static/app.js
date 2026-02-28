@@ -44,7 +44,7 @@ try {
 // Sign out logic
 document.getElementById('btn-logout').onclick = () => {
     signOut(auth).then(() => {
-        window.location.reload();
+        window.location.href = '/logout';
     });
 };
 
