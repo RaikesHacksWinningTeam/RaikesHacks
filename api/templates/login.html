@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+
+{% block title %} 
+    Login
+{% endblock %}
+
+{% block main %}
+    <body>
+        <main class="container py-5 text-center">
+            <div>
+                <h1>Login Page</h1>
+            </div>
+            <div>
+                <button id="google-signin-btn">Sign in with Google</button>
+            </div>
+        </main>
+        <script type="module" src="{{ url_for('static', filename='js/login.js') }}" defer></script>
+    </body>
+{% endblock %}
