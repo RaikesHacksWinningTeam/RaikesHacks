@@ -45,7 +45,9 @@ export function renderDashboard(state) {
             </thead>
             <tbody>
                 ${state.allOrganizations.map(org => {
-        const orgEvents = state.events.filter(e => e.org_id === org.id);
+        const orgEvents = state.events
+            .filter(e => e.org_id === org.id)
+            .sort((a, b) => new Date(a.start) - new Date(b.start));
         const isExpanded = state.expandedOrgId === org.id;
         const activeNow = orgEvents.some(e => {
             const start = new Date(e.start);
@@ -79,9 +81,13 @@ export function renderDashboard(state) {
             const myRole = myOrg?.role || 'viewer';
             const canEdit = ['admin', 'owner'].includes(myRole);
 
+            const eventDate = e.date ? new Date(e.date + 'T00:00:00') : new Date(e.start);
+            const dateDisplay = eventDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
             return `
                                                 <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: white; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid #e2e8f0;">
-                                                    <div style="font-size: 0.85rem; color: #64748b; width: 150px;">
+                                                    <div style="font-size: 0.85rem; color: #64748b; width: 180px;">
+                                                        <div style="font-weight: 700; color: #1e293b;">${dateDisplay}</div>
                                                         ${new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(e.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </div>
                                                     <div style="flex: 1;">

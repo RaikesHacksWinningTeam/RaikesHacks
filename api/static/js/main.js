@@ -171,12 +171,15 @@ document.addEventListener("DOMContentLoaded", () => {
             const eventId = document.getElementById('event-id').value;
             const eventOrgSelect = document.getElementById('event-org');
             const eventRoomSelect = document.getElementById('event-room');
+            const eventDateValue = document.getElementById('event-date').value;
 
-            const startDate = new Date();
+            const [year, month, day] = eventDateValue.split('-').map(Number);
+
+            const startDate = new Date(year, month - 1, day);
             const [sH, sM] = document.getElementById('event-start').value.split(':');
             startDate.setHours(parseInt(sH), parseInt(sM), 0, 0);
 
-            const endDate = new Date();
+            const endDate = new Date(year, month - 1, day);
             const [eH, eM] = document.getElementById('event-end').value.split(':');
             endDate.setHours(parseInt(eH), parseInt(eM), 0, 0);
 
