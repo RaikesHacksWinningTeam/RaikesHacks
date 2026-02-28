@@ -292,6 +292,32 @@ def get_org_members(org_id):
     return jsonify({'members': members}), 200
 
 
+@app.route("/api/orgs/<org_id>", methods=["DELETE"])
+def delete_org(org_id):
+    """Delete an organization. Only the org owner (or global admin) may do this."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    org = user_manager.get_org(org_id)
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    members = org.get('members', {})
+    caller_role = members.get(g.user['uid'])
+
+    if caller_role != 'owner' and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'Only the organization owner can delete it'}), 403
+
+    # Remove org from every member's user document
+    for uid in list(members.keys()):
+        user_manager.remove_user_from_org(uid, org_id)
+
+    # Delete the organization document itself
+    db.collection('organizations').document(org_id).delete()
+
+    return jsonify({'status': 'success', 'org_id': org_id}), 200
+
+
 @app.route("/api/orgs/<org_id>/members", methods=["POST"])
 def assign_org_member(org_id):
     """Assign (or update) a role for a user within an org.

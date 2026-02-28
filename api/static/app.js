@@ -452,6 +452,13 @@ function renderMyOrgsPanel() {
                     </div>
                 </div>
                 <span class="role-badge ${role}">${role}</span>
+                ${role === 'owner' ? `
+                <button class="btn-delete-org" title="Delete Organization"
+                    onclick="event.stopPropagation(); deleteOrg('${org.id}', '${org.name.replace(/'/g, "&#39;")}')"
+                    style="background:none;border:none;cursor:pointer;color:#ef4444;padding:0.25rem;border-radius:6px;display:flex;align-items:center;transition:background 0.15s;" 
+                    onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'">
+                    <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+                </button>` : ''}
                 <i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px;"></i>
             </div>
             <div class="org-member-panel" id="org-member-panel-${org.id}">
@@ -583,9 +590,30 @@ async function setMemberRole(orgId, targetUid, newRole, clickedBtn) {
     if (panel) buildMemberPanel(orgId, panel);
 }
 
+// --- Delete Org ---
+async function deleteOrg(orgId, orgName) {
+    if (!confirm(`Are you sure you want to permanently delete "${orgName}"?\n\nThis cannot be undone and will remove all members.`)) return;
+
+    try {
+        const res = await fetch(`/api/orgs/${orgId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to delete organization');
+
+        // Remove from local state and re-render
+        userOrgs = userOrgs.filter(o => o.id !== orgId);
+        delete _memberCache[orgId];
+        renderMyOrgsPanel();
+        updateOrgSwitcher();
+        showToast(`"${orgName}" has been deleted.`, 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
 // Expose to global scope (called from inline onclick)
 window.toggleOrgCard = toggleOrgCard;
 window.setMemberRole = setMemberRole;
+window.deleteOrg = deleteOrg;
 
 // --- Update the org-switcher chip in the header ---
 function updateOrgSwitcher() {
