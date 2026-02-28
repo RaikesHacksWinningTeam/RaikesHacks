@@ -8,14 +8,19 @@ export function editEventModal(eventId, state) {
 
     const eventOrgSelect = document.getElementById('event-org');
     const eventRoomSelect = document.getElementById('event-room');
+    const eventDateInput = document.getElementById('event-date');
 
     const manageableOrgs = state.userOrgs.filter(o => ['admin', 'owner'].includes(o.role));
 
     if (eventOrgSelect) eventOrgSelect.innerHTML = manageableOrgs.map(o => `<option value="${o.id}" ${o.id === event.org_id ? 'selected' : ''}>${o.name}</option>`).join('');
     if (eventRoomSelect) eventRoomSelect.innerHTML = state.rooms.map(r => `<option value="${r.id}" ${r.id === event.room_id ? 'selected' : ''}>${r.name}</option>`).join('');
 
-    const startStr = new Date(event.start).toTimeString().slice(0, 5);
+    const eventStartDate = new Date(event.start);
+    const dateStr = eventStartDate.toISOString().split('T')[0];
+    const startStr = eventStartDate.toTimeString().slice(0, 5);
     const endStr = new Date(event.end).toTimeString().slice(0, 5);
+    
+    if (eventDateInput) eventDateInput.value = dateStr;
     document.getElementById('event-start').value = startStr;
     document.getElementById('event-end').value = endStr;
 
@@ -28,16 +33,18 @@ export function editEventModal(eventId, state) {
     if (canEdit) {
         if (btnDelete) btnDelete.classList.remove('hidden');
         if (btnSave) btnSave.disabled = false;
-        eventOrgSelect.disabled = false;
-        eventRoomSelect.disabled = false;
+        if (eventOrgSelect) eventOrgSelect.disabled = false;
+        if (eventRoomSelect) eventRoomSelect.disabled = false;
+        if (eventDateInput) eventDateInput.disabled = false;
         document.getElementById('event-title').disabled = false;
         document.getElementById('event-start').disabled = false;
         document.getElementById('event-end').disabled = false;
     } else {
         if (btnDelete) btnDelete.classList.add('hidden');
         if (btnSave) btnSave.disabled = true;
-        eventOrgSelect.disabled = true;
-        eventRoomSelect.disabled = true;
+        if (eventOrgSelect) eventOrgSelect.disabled = true;
+        if (eventRoomSelect) eventRoomSelect.disabled = true;
+        if (eventDateInput) eventDateInput.disabled = true;
         document.getElementById('event-title').disabled = true;
         document.getElementById('event-start').disabled = true;
         document.getElementById('event-end').disabled = true;
@@ -50,12 +57,19 @@ export function editEventModal(eventId, state) {
 export function createEventModal(state) {
     const eventOrgSelect = document.getElementById('event-org');
     const eventRoomSelect = document.getElementById('event-room');
+    const eventDateInput = document.getElementById('event-date');
 
     document.getElementById('modal-title').textContent = 'Create New Event';
     document.getElementById('event-id').value = '';
     document.getElementById('event-title').value = '';
     document.getElementById('event-start').value = '';
     document.getElementById('event-end').value = '';
+    
+    const today = new Date().toISOString().split('T')[0];
+    if (eventDateInput) {
+        eventDateInput.value = today;
+        eventDateInput.disabled = false;
+    }
 
     const btnDelete = document.getElementById('btn-delete-event');
     if (btnDelete) btnDelete.classList.add('hidden');
