@@ -9,15 +9,18 @@ import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/fi
 // Initialize Firebase
 let db;
 let auth;
+console.log("Attempting to initialize Firebase with:", firebaseConfig);
+
 try {
-    if (firebaseConfig && firebaseConfig.apiKey) {
+    if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
         const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
-        console.log("Firebase initialized successfully using environment variables.");
+        console.log("✅ Firebase initialized successfully.");
         
         // Track login status
         onAuthStateChanged(auth, (user) => {
+            console.log("👤 Auth State Changed. User:", user ? user.email : "Logged Out");
             const createBtn = document.getElementById('btn-create-event');
             const loginLink = document.getElementById('btn-login-page');
             const logoutBtn = document.getElementById('btn-logout');
@@ -33,10 +36,10 @@ try {
             }
         });
     } else {
-        console.warn("Firebase config is missing API Key. Check your .env file.");
+        console.error("❌ Firebase config is missing or contains placeholders! Check your .env file.");
     }
 } catch (e) {
-    console.error("Firebase initialization error:", e);
+    console.error("💥 Firebase initialization error:", e);
 }
 
 // Sign out logic
@@ -66,19 +69,29 @@ const eventRoomSelect = document.getElementById('event-room');
 
 // --- Real-time Firestore Listeners ---
 if (db) {
+    console.log("Setting up real-time listeners...");
+    
     // Listen for Rooms
     onSnapshot(collection(db, "rooms"), (snapshot) => {
         rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log("Rooms updated:", rooms.length);
         renderFloorPlan();
         if (selectedRoomId) updateSidePanel();
+    }, (error) => {
+        console.error("Rooms listener error:", error);
     });
 
     // Listen for Events
     onSnapshot(collection(db, "events"), (snapshot) => {
         events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log("Events updated:", events.length);
         renderFloorPlan();
         if (selectedRoomId) updateSidePanel();
+    }, (error) => {
+        console.error("Events listener error:", error);
     });
+} else {
+    console.warn("Firestore 'db' not initialized. Check your config and browser console for errors.");
 }
 
 // --- D3.js Floor Plan Rendering ---
