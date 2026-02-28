@@ -11,7 +11,7 @@ from firebase_admin import credentials, auth, firestore
 
 from icalendar import Calendar, Event
 from flask import Response
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from extensions import db
 from src.user import User
@@ -127,7 +127,7 @@ def verify_google_token():
         user_data = user_manager.save_user(uid, email)
         orgs = user_data.get('organizations', [])
 
-        expires_in = datetime.timedelta(days=5)
+        expires_in = timedelta(days=5)
         session_cookie = auth.create_session_cookie(id_token, expires_in=expires_in)
 
         # If user has no organizations, redirect them to onboarding
@@ -139,16 +139,21 @@ def verify_google_token():
             'redirect_url': redirect_url
         })
         
-        # Determine if we should use secure=True (HTTPS)
-        is_prod = os.getenv('FLASK_ENV') == 'production'
+        # Determine if we should use secure=True.
+        # Check if the request came over HTTPS directly or via an X-Forwarded-Proto header.
+        is_https = request.is_secure or request.headers.get('X-Forwarded-Proto', 'http') == 'https'
         
+        # In strictly localhost dev environments without HTTPS, we might set secure=False.
+        is_localhost = request.host.startswith('localhost') or request.host.startswith('127.0.0.1')
+        cookie_secure = is_https if not is_localhost else False
+
         response.set_cookie(
             'session', 
             session_cookie, 
             max_age=int(expires_in.total_seconds()),
-            expires=datetime.datetime.now(datetime.timezone.utc) + expires_in, 
+            expires=datetime.now(timezone.utc) + expires_in, 
             httponly=True, 
-            secure=is_prod,
+            secure=cookie_secure,
             samesite='Lax'
         )
 
@@ -191,6 +196,7 @@ def get_user_orgs():
             'id': org_id,
             'name': org.get('name', ''),
             'role': role,
+            'color': org.get('color'),
             'invite_code': org.get('invite_code') if role in ('owner', 'admin') else None,
         })
 
@@ -226,7 +232,8 @@ def create_org():
         'status': 'success',
         'org_id': org_id,
         'name': org_name,
-        'invite_code': invite_code
+        'invite_code': invite_code,
+        'color': None
     }), 201
 
 
@@ -266,7 +273,8 @@ def join_org():
         'status': 'success',
         'org_id': org_id,
         'name': org_data.get('name', ''),
-        'role': 'viewer'
+        'role': 'viewer',
+        'color': org_data.get('color')
     }), 200
 
 
@@ -355,6 +363,48 @@ def assign_org_member(org_id):
 
     user_manager.assign_org_role(org_id, target_uid, role)
     return jsonify({'status': 'success', 'org_id': org_id, 'uid': target_uid, 'role': role}), 200
+
+
+
+@app.route("/api/orgs/<org_id>", methods=["PATCH"])
+def update_org_metadata(org_id):
+    """Update organization metadata like color. Requires caller to be owner/admin."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    org = user_manager.get_org(org_id)
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    members = org.get('members', {})
+    caller_role = members.get(g.user['uid'])
+    if caller_role not in ('owner', 'admin') and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'Insufficient permissions'}), 403
+
+    data = request.get_json() or {}
+    color = data.get('color')
+    if color:
+        user_manager.update_org_color(org_id, color)
+
+    return jsonify({'status': 'success', 'org_id': org_id}), 200
+
+
+@app.route("/api/orgs/<org_id>", methods=["DELETE"])
+def delete_org(org_id):
+    """Delete an organization. Requires caller to be the 'owner'."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    org = user_manager.get_org(org_id)
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    members = org.get('members', {})
+    if members.get(g.user['uid']) != 'owner' and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'Only the organization owner can delete it'}), 403
+
+    user_manager.delete_organization(org_id)
+    return jsonify({'status': 'success', 'org_id': org_id}), 200
 
 
 

@@ -10,7 +10,6 @@
     <script id="firebase-config" type="application/json">
         {{ firebase_config | tojson }}
     </script>
-    <script type="module" src="{{ url_for('static', filename='login.js') }}"></script>
     <style>
         .login-container {
             height: 100vh;
@@ -112,29 +111,8 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-        const firebaseConfig = {{ firebase_config | tojson }};
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const provider = new GoogleAuthProvider();
-
-        document.getElementById('btn-google-login').onclick = async () => {
-            try {
-                const result = await signInWithPopup(auth, provider);
-                console.log("Logged in user:", result.user.email);
-                window.location.href = "/";
-            } catch (error) {
-                console.error("Login failed:", error);
-                if (error.code !== 'auth/popup-closed-by-user') {
-                    alert("Google Login failed: " + error.message);
-                }
-            }
-        };
-
+    <script type="module" src="{{ url_for('static', filename='js/login.js') }}"></script>
+    <script>
         lucide.createIcons();
     </script>
 </body>

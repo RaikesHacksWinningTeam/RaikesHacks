@@ -111,6 +111,31 @@ class User:
             'organizations': firestore.ArrayUnion([org_id])
         }, merge=True)
 
+    def update_org_color(self, org_id, color):
+        """Update the brand color of an organization."""
+        self.orgs_coll.document(org_id).update({'color': color})
+
+    def delete_organization(self, org_id):
+        """Delete an organization and remove it from all members.
+        
+        Warning: This is a destructive operation.
+        """
+        org_doc = self.orgs_coll.document(org_id).get()
+        if not org_doc.exists:
+            return
+
+        org_data = org_doc.to_dict()
+        member_uids = org_data.get('members', {}).keys()
+
+        # Remove org_id from all users' organizations array
+        for uid in member_uids:
+            self.users_coll.document(uid).update({
+                'organizations': firestore.ArrayRemove([org_id])
+            })
+
+        # Delete the organization document itself
+        self.orgs_coll.document(org_id).delete()
+
     def get_org(self, org_id):
         """Fetch organization data from Firestore by org ID.
 

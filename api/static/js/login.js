@@ -12,23 +12,42 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-document.getElementById('btn-google-login').addEventListener('click', () => {
-    signInWithPopup(auth, provider)
-        .then((result) => result.user.getIdToken())
-        .then((idToken) => {
-            return fetch('/api/auth/google', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken: idToken })
-            });
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                window.location.href = data.redirect_url || '/';
-            } else {
-                alert("Auth failed: " + data.message);
-            }
-        })
-        .catch((error) => console.error("Firebase Error:", error));
+document.getElementById('btn-google-login').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-google-login');
+    const originalHtml = btn.innerHTML;
+
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 18px; height: 18px;"></i> Signing in...';
+        if (window.lucide) window.lucide.createIcons();
+
+        const result = await signInWithPopup(auth, provider);
+        const idToken = await result.user.getIdToken();
+
+        btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 18px; height: 18px;"></i> Creating Session...';
+        if (window.lucide) window.lucide.createIcons();
+
+        const response = await fetch('/api/auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken })
+        });
+
+        const data = await response.json();
+        if (data.status === 'success') {
+            window.location.href = data.redirect_url || '/';
+        } else {
+            await auth.signOut();
+            alert("Auth failed: " + (data.message || "Unknown error"));
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            if (window.lucide) window.lucide.createIcons();
+        }
+    } catch (error) {
+        console.error("Firebase Error:", error);
+        alert("Google Error: " + error.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        if (window.lucide) window.lucide.createIcons();
+    }
 });

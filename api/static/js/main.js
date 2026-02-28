@@ -1,5 +1,5 @@
 import { db, auth, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, onAuthStateChanged, signOut } from './firebase-config.js';
-import { fetchUserOrgs, setMemberRoleAPI, createOrgAPI, joinOrgAPI, fetchOrgMembersAPI } from './api.js';
+import { fetchUserOrgs, setMemberRoleAPI, createOrgAPI, joinOrgAPI, fetchOrgMembersAPI, updateOrgMetadataAPI, deleteOrgAPI, ensureAuthSynced } from './api.js';
 import { renderDashboard, updateOrgSwitcher, renderMyOrgsPanel, buildMemberPanel, showToast } from './ui-render.js';
 import { openCalendarModal } from './calendar.js';
 import { editEventModal, createEventModal } from './admin.js';
@@ -93,6 +93,33 @@ window.setMemberRole = async (orgId, uid, role) => {
             renderDashboard(state);
 
             showToast("Role updated");
+        }
+    } catch (e) { console.error(e); }
+};
+
+window.updateOrgColor = async (orgId, color) => {
+    try {
+        const res = await updateOrgMetadataAPI(orgId, { color });
+        if (res.ok) {
+            const orgData = await fetchUserOrgs();
+            state.userOrgs = orgData.orgs || [];
+            renderDashboard(state);
+            renderMyOrgsPanel(state.userOrgs);
+            showToast("Brand color updated");
+        }
+    } catch (e) { console.error(e); }
+};
+
+window.deleteOrganization = async (orgId, orgName) => {
+    if (!confirm(`Are you sure you want to delete "${orgName}"? All data will be lost.`)) return;
+    try {
+        const res = await deleteOrgAPI(orgId);
+        if (res.ok) {
+            const orgData = await fetchUserOrgs();
+            state.userOrgs = orgData.orgs || [];
+            renderDashboard(state);
+            renderMyOrgsPanel(state.userOrgs);
+            showToast("Organization deleted");
         }
     } catch (e) { console.error(e); }
 };
@@ -417,6 +444,9 @@ onAuthStateChanged(auth, async (user) => {
     const orgSwitcher = document.getElementById('btn-open-org-modal');
 
     if (user) {
+        // Sync with backend session first to prevent race conditions
+        await ensureAuthSynced();
+
         loginLink?.classList.add('hidden');
         logoutBtn?.classList.remove('hidden');
         orgSwitcher?.classList.remove('hidden');
