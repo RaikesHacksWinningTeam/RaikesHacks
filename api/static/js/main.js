@@ -1,0 +1,286 @@
+import { db, auth, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, onAuthStateChanged, signOut } from './firebase-config.js';
+import { fetchUserOrgs, setMemberRoleAPI, createOrgAPI, joinOrgAPI, fetchOrgMembersAPI } from './api.js';
+import { renderDashboard, updateOrgSwitcher, renderMyOrgsPanel, buildMemberPanel, showToast } from './ui-render.js';
+import { openCalendarModal } from './calendar.js';
+import { editEventModal, createEventModal } from './admin.js';
+
+// Global State
+export let state = {
+    rooms: [],
+    events: [],
+    allOrganizations: [],
+    userOrgs: [],
+    expandedOrgId: null,
+    currentTime: new Date()
+};
+
+// Start clock
+const displayTimeElement = document.getElementById('display-time');
+function updateTimeDisplay() {
+    state.currentTime = new Date();
+    if (displayTimeElement) {
+        displayTimeElement.textContent = state.currentTime.toLocaleString([], { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+}
+setInterval(updateTimeDisplay, 60000);
+updateTimeDisplay();
+
+// Initialize UI
+if (window.lucide) window.lucide.createIcons();
+
+// Export globals for inline HTML handlers
+window.toggleOrgExpansion = (orgId) => {
+    state.expandedOrgId = state.expandedOrgId === orgId ? null : orgId;
+    renderDashboard(state);
+};
+
+window.openCalendarModal = (eventId) => {
+    openCalendarModal(eventId, state);
+};
+
+window.editEvent = (eventId) => {
+    editEventModal(eventId, state);
+};
+
+// Organization Modal Global Behaviors
+const _memberCache = {};
+window.toggleOrgCard = async (orgId) => {
+    const card = document.getElementById(`org-card-${orgId}`);
+    const panel = document.getElementById(`org-member-panel-${orgId}`);
+    if (!card || !panel) return;
+
+    const isOpen = panel.style.display === 'block';
+    document.querySelectorAll('.org-member-panel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.org-card-expand-icon').forEach(i => i.style.transform = 'rotate(0deg)');
+
+    if (!isOpen) {
+        panel.style.display = 'block';
+        card.querySelector('.org-card-expand-icon').style.transform = 'rotate(180deg)';
+        if (!_memberCache[orgId]) {
+            const res = await fetchOrgMembersAPI(orgId);
+            if (res.ok) {
+                const data = await res.json();
+                _memberCache[orgId] = data.members;
+            }
+        }
+        buildMemberPanel(orgId, panel, _memberCache[orgId] || [], state.userOrgs);
+    }
+};
+
+window.setMemberRole = async (orgId, uid, role) => {
+    try {
+        const res = await setMemberRoleAPI(orgId, uid, role);
+        if (res.ok) {
+            _memberCache[orgId] = null; // force reload
+            // Refresh inline
+            document.querySelectorAll('.org-member-panel').forEach(p => p.style.display = 'none');
+            window.toggleOrgCard(orgId);
+            showToast("Role updated");
+        }
+    } catch (e) { console.error(e); }
+};
+
+// DOM Event Listeners
+document.addEventListener("DOMContentLoaded", () => {
+    // --- Logout Logic ---
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+        btnLogout.onclick = () => {
+            signOut(auth).then(() => {
+                window.location.href = '/logout'; // Clear Flask session too
+            }).catch(e => console.error("Sign out error:", e));
+        };
+    }
+
+    // --- Calendar Handlers ---
+    const btnCopyCalendarLink = document.getElementById('btn-copy-calendar-link');
+    const calendarLinkInput = document.getElementById('calendar-link-input');
+    const calendarModal = document.getElementById('calendar-modal');
+
+    if (document.getElementById('btn-close-calendar-modal')) {
+        document.getElementById('btn-close-calendar-modal').onclick = () => calendarModal?.classList.add('hidden');
+    }
+    if (document.getElementById('btn-close-calendar-modal-footer')) {
+        document.getElementById('btn-close-calendar-modal-footer').onclick = () => calendarModal?.classList.add('hidden');
+    }
+    if (btnCopyCalendarLink) {
+        btnCopyCalendarLink.onclick = () => {
+            if (calendarLinkInput) {
+                calendarLinkInput.select();
+                navigator.clipboard.writeText(calendarLinkInput.value).then(() => {
+                    const originalHtml = btnCopyCalendarLink.innerHTML;
+                    btnCopyCalendarLink.innerHTML = '<i data-lucide="check" style="width: 18px; height: 18px;"></i> Copied!';
+                    if (window.lucide) window.lucide.createIcons();
+                    setTimeout(() => {
+                        btnCopyCalendarLink.innerHTML = originalHtml;
+                        if (window.lucide) window.lucide.createIcons();
+                    }, 2000);
+                });
+            }
+        };
+    }
+
+    // --- Admin Event Modals ---
+    const adminModal = document.getElementById('admin-modal');
+    if (document.getElementById('btn-create-event')) {
+        document.getElementById('btn-create-event').onclick = () => createEventModal(state);
+    }
+    if (document.getElementById('btn-close-modal')) {
+        document.getElementById('btn-close-modal').onclick = () => adminModal?.classList.add('hidden');
+    }
+    if (document.getElementById('btn-cancel-modal')) {
+        document.getElementById('btn-cancel-modal').onclick = () => adminModal?.classList.add('hidden');
+    }
+
+    if (document.getElementById('btn-delete-event')) {
+        document.getElementById('btn-delete-event').onclick = async () => {
+            const eventId = document.getElementById('event-id').value;
+            if (confirm('Are you sure?')) {
+                await deleteDoc(doc(db, "events", eventId));
+                adminModal?.classList.add('hidden');
+            }
+        };
+    }
+
+    const eventForm = document.getElementById('event-form');
+    if (eventForm) {
+        eventForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const eventId = document.getElementById('event-id').value;
+            const eventOrgSelect = document.getElementById('event-org');
+            const eventRoomSelect = document.getElementById('event-room');
+
+            const startDate = new Date();
+            const [sH, sM] = document.getElementById('event-start').value.split(':');
+            startDate.setHours(parseInt(sH), parseInt(sM), 0, 0);
+
+            const endDate = new Date();
+            const [eH, eM] = document.getElementById('event-end').value.split(':');
+            endDate.setHours(parseInt(eH), parseInt(eM), 0, 0);
+
+            const data = {
+                org_id: eventOrgSelect.value,
+                room_id: eventRoomSelect.value,
+                title: document.getElementById('event-title').value,
+                start: startDate.toISOString(),
+                end: endDate.toISOString(),
+                organizer: 'Staff',
+                status: 'scheduled'
+            };
+
+            if (eventId) {
+                await updateDoc(doc(db, "events", eventId), data);
+            } else {
+                data.createdAt = serverTimestamp();
+                await addDoc(collection(db, "events"), data);
+            }
+            adminModal?.classList.add('hidden');
+        };
+    }
+
+    // --- Organization Modal Handlers ---
+    function switchOrgTab(tabId) {
+        document.querySelectorAll('.org-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
+        document.querySelectorAll('.org-tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tabId}`));
+    }
+    document.querySelectorAll('.org-tab').forEach(tab => tab.onclick = () => switchOrgTab(tab.dataset.tab));
+
+    const orgModal = document.getElementById('org-modal');
+    if (document.getElementById('btn-open-org-modal')) {
+        document.getElementById('btn-open-org-modal').onclick = () => {
+            orgModal?.classList.remove('hidden');
+            switchOrgTab('my-orgs');
+        };
+    }
+    if (document.getElementById('btn-close-org-modal')) {
+        document.getElementById('btn-close-org-modal').onclick = () => orgModal?.classList.add('hidden');
+    }
+    if (orgModal) {
+        orgModal.onclick = (e) => { if (e.target === orgModal) orgModal.classList.add('hidden'); };
+    }
+
+    const createOrgForm = document.getElementById('create-org-form');
+    if (createOrgForm) {
+        createOrgForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('org-name-input').value;
+            const res = await createOrgAPI(name);
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('new-org-code').textContent = data.invite_code;
+                document.getElementById('new-org-invite-box').classList.remove('hidden');
+
+                const orgData = await fetchUserOrgs();
+                state.userOrgs = orgData.orgs || [];
+                updateOrgSwitcher(state.userOrgs);
+                renderMyOrgsPanel(state.userOrgs);
+
+                showToast("Organization created");
+            }
+        };
+    }
+
+    const joinOrgForm = document.getElementById('join-org-form');
+    if (joinOrgForm) {
+        joinOrgForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const code = document.getElementById('org-invite-code-input').value;
+            const res = await joinOrgAPI(code);
+            if (res.ok) {
+                const orgData = await fetchUserOrgs();
+                state.userOrgs = orgData.orgs || [];
+                updateOrgSwitcher(state.userOrgs);
+                renderMyOrgsPanel(state.userOrgs);
+
+                switchOrgTab('my-orgs');
+                showToast("Joined organization");
+            } else {
+                showToast("Invalid code", "error");
+            }
+        };
+    }
+});
+
+// Initializers
+onAuthStateChanged(auth, async (user) => {
+    const createBtn = document.getElementById('btn-create-event');
+    const loginLink = document.getElementById('btn-login-page');
+    const logoutBtn = document.getElementById('btn-logout');
+    const orgSwitcher = document.getElementById('btn-open-org-modal');
+
+    if (user) {
+        createBtn?.classList.remove('hidden');
+        loginLink?.classList.add('hidden');
+        logoutBtn?.classList.remove('hidden');
+        orgSwitcher?.classList.remove('hidden');
+
+        const data = await fetchUserOrgs();
+        state.userOrgs = data.orgs || [];
+        updateOrgSwitcher(state.userOrgs);
+        renderMyOrgsPanel(state.userOrgs);
+    } else {
+        createBtn?.classList.add('hidden');
+        loginLink?.classList.remove('hidden');
+        logoutBtn?.classList.add('hidden');
+        orgSwitcher?.classList.add('hidden');
+        state.userOrgs = [];
+    }
+});
+
+// Firestore Listeners
+if (db) {
+    onSnapshot(collection(db, "rooms"), (snapshot) => {
+        state.rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderDashboard(state);
+    });
+
+    onSnapshot(collection(db, "events"), (snapshot) => {
+        state.events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderDashboard(state);
+    });
+
+    onSnapshot(collection(db, "organizations"), (snapshot) => {
+        state.allOrganizations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderDashboard(state);
+    });
+}

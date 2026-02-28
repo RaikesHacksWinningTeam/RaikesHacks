@@ -111,7 +111,8 @@
                             <input type="time" id="event-end" required>
                         </div>
                     </div>
-                    <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="modal-footer"
+                        style="display: flex; justify-content: space-between; align-items: center;">
                         <button type="button" class="btn btn-alert hidden" id="btn-delete-event">
                             <i data-lucide="trash-2"></i>
                             Delete Event
@@ -222,12 +223,14 @@
             </div>
             <div class="modal-body">
                 <p style="margin-bottom: 1rem; color: #64748b; font-size: 0.9rem;">
-                    Copy the link below and paste it into your calendar application (like Google Calendar, Apple Calendar, or Outlook) to add this event.
+                    Copy the link below and paste it into your calendar application (like Google Calendar, Apple
+                    Calendar, or Outlook) to add this event.
                 </p>
                 <div class="form-group">
                     <label>Calendar Link (.ics)</label>
                     <div style="display: flex; gap: 0.5rem;">
-                        <input type="text" id="calendar-link-input" readonly style="flex: 1; background: #f8fafc; cursor: text;">
+                        <input type="text" id="calendar-link-input" readonly
+                            style="flex: 1; background: #f8fafc; cursor: text;">
                         <button class="btn btn-primary" id="btn-copy-calendar-link" title="Copy to clipboard">
                             <i data-lucide="copy" style="width: 18px; height: 18px;"></i>
                             Copy
@@ -245,7 +248,7 @@
     <script>
         window.firebaseConfig = {{ firebase_config | tojson }};
     </script>
-    <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 
 </html>
