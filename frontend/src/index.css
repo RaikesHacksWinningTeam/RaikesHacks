@@ -1,0 +1,138 @@
+:root {
+  --primary: #0a2540;
+  --secondary: #635bff;
+  --accent: #00d4ff;
+  --background: #f6f9fc;
+  --text: #425466;
+  --text-dark: #1e2124;
+  --sidebar-width: 350px;
+  --heatmap-low: #e3f2fd;
+  --heatmap-mid: #64b5f6;
+  --heatmap-high: #1565c0;
+  --error: #ef4444;
+  --success: #22c55e;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--background);
+  color: var(--text);
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+.dashboard-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background: white;
+  border-left: 1px solid #e6ebf1;
+  box-shadow: var(--shadow);
+  z-index: 10;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.header {
+  padding: 1rem 1.5rem;
+  background: white;
+  border-bottom: 1px solid #e6ebf1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.floor-plan-container {
+  flex: 1;
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #ffffff;
+  overflow: auto;
+}
+
+.timeline-bar {
+  height: 80px;
+  background: white;
+  border-top: 1px solid #e6ebf1;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.btn {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background: var(--secondary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #5345d9;
+  transform: translateY(-1px);
+}
+
+.room {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.room:hover {
+  filter: brightness(0.95);
+}
+
+.room.active rect {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  flex: 1;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 5px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--secondary);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(0,0,0,0.2);
+}
