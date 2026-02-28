@@ -12,7 +12,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-document.getElementById('google-signin-btn').addEventListener('click', () => {
+document.getElementById('btn-google-login').addEventListener('click', () => {
     signInWithPopup(auth, provider)
         .then((result) => result.user.getIdToken())
         .then((idToken) => {
