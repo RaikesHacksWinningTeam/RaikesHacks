@@ -176,7 +176,18 @@ export function renderDashboard(state) {
             ` : ''}
         `;
 
-        const orgEvents = state.events.filter(e => e.org_id === org.id);
+        const selectedY = state.selectedDate.getFullYear();
+        const selectedM = state.selectedDate.getMonth();
+        const selectedD = state.selectedDate.getDate();
+
+        const orgEvents = state.events.filter(e => {
+            if (e.org_id !== org.id) return false;
+            const eStart = new Date(e.start);
+            return eStart.getFullYear() === selectedY &&
+                   eStart.getMonth() === selectedM &&
+                   eStart.getDate() === selectedD;
+        });
+
         orgEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
         let layers = [];
 
@@ -261,6 +272,7 @@ export function renderDashboard(state) {
 
     if (window.lucide) window.lucide.createIcons();
 }
+
 
 export function updateOrgSwitcher(userOrgs) {
     const label = document.getElementById('org-switcher-label');

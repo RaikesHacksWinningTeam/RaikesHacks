@@ -11,7 +11,8 @@ export let state = {
     allOrganizations: [],
     userOrgs: [],
     expandedOrgId: null,
-    currentTime: new Date()
+    currentTime: new Date(),
+    selectedDate: new Date()
 };
 
 function updateCreateButtonVisibility() {
@@ -27,14 +28,46 @@ function updateCreateButtonVisibility() {
 
 // Start clock
 const displayTimeElement = document.getElementById('display-time');
+const datePickerElement = document.getElementById('dashboard-date-picker');
+const timeDisplayContainer = document.getElementById('current-time-display');
+
 function updateTimeDisplay() {
-    state.currentTime = new Date();
     if (displayTimeElement) {
-        displayTimeElement.textContent = state.currentTime.toLocaleString([], { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        displayTimeElement.textContent = state.selectedDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     }
 }
-setInterval(updateTimeDisplay, 60000);
 updateTimeDisplay();
+
+if (datePickerElement) {
+    const yyyy = state.selectedDate.getFullYear();
+    const mm = String(state.selectedDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(state.selectedDate.getDate()).padStart(2, '0');
+    datePickerElement.value = `${yyyy}-${mm}-${dd}`;
+
+    datePickerElement.addEventListener('change', (e) => {
+        if (e.target.value) {
+            const [y, m, d] = e.target.value.split('-');
+            state.selectedDate = new Date(y, m - 1, d);
+            updateTimeDisplay();
+            renderDashboard(state);
+        }
+    });
+
+    if (timeDisplayContainer) {
+        timeDisplayContainer.addEventListener('click', () => {
+            try {
+                if (typeof datePickerElement.showPicker === 'function') {
+                    datePickerElement.showPicker();
+                } else {
+                    datePickerElement.focus();
+                    datePickerElement.click();
+                }
+            } catch (error) {
+                console.error("Date picker could not be opened:", error);
+            }
+        });
+    }
+}
 
 // Initialize UI
 if (window.lucide) window.lucide.createIcons();

@@ -22,9 +22,10 @@
                         <i data-lucide="calendar" class="logo-icon"></i>
                         Building Events Dashboard
                     </h1>
-                    <div id="current-time-display" class="time-badge">
-                        <i data-lucide="clock"></i>
+                    <div id="current-time-display" class="time-badge" style="position: relative; overflow: hidden; cursor: pointer;">
+                        <i data-lucide="calendar"></i>
                         <span id="display-time">Loading...</span>
+                        <input type="date" id="dashboard-date-picker" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
                     </div>
                 </div>
                 <div class="header-right">
