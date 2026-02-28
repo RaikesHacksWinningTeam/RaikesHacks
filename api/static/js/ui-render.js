@@ -340,7 +340,7 @@ export function renderMyOrgsPanel(userOrgs) {
 export function buildMemberPanel(orgId, panel, members, userOrgs) {
     const org = userOrgs.find(o => o.id === orgId);
     const myRole = org?.role || 'viewer';
-    const canEdit = ['owner', 'admin'].includes(myRole);
+    const canEdit = myRole === 'owner';
 
     panel.innerHTML = members.map(m => {
         const initial = (m.email || '?')[0].toUpperCase();

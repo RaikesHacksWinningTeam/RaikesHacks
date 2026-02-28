@@ -361,6 +361,12 @@ def assign_org_member(org_id):
     if role == 'owner' and caller_role != 'owner' and not g.user.get('is_global_admin'):
         return jsonify({'error': 'Only org owners can grant the owner role'}), 403
 
+    # Non-owners cannot promote someone to admin or change another admin's role
+    if target_current_role == 'admin' and caller_role != 'owner' and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'Only org owners can modify an admin\'s role'}), 403
+    if role == 'admin' and caller_role != 'owner' and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'Only org owners can grant the admin role'}), 403
+
     user_manager.assign_org_role(org_id, target_uid, role)
     return jsonify({'status': 'success', 'org_id': org_id, 'uid': target_uid, 'role': role}), 200
 
