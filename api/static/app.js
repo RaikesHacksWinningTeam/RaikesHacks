@@ -234,11 +234,22 @@ eventForm.onsubmit = async (e) => {
         return;
     }
 
+    const startTimeValue = document.getElementById('event-start').value;
+    const endTimeValue = document.getElementById('event-end').value;
+
+    const startDate = new Date();
+    const [startH, startM] = startTimeValue.split(':');
+    startDate.setHours(parseInt(startH), parseInt(startM), 0, 0);
+
+    const endDate = new Date();
+    const [endH, endM] = endTimeValue.split(':');
+    endDate.setHours(parseInt(endH), parseInt(endM), 0, 0);
+
     const newEvent = {
         room_id: document.getElementById('event-room').value,
         title: document.getElementById('event-title').value,
-        start: new Date().toISOString(),
-        end: new Date(Date.now() + 3600000).toISOString(),
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
         type: 'general',
         organizer: 'Staff',
         status: 'scheduled',
