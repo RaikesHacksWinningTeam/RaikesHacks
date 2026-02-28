@@ -653,7 +653,9 @@ function buildMemberPanel(orgId, panel) {
     // ---- REGULAR MEMBER / VIEWER VIEW ----
     const meEntry = allMembers.find(m => m.uid === (window._currentUid || ''));
     const ownersList = activeMembers.filter(m => m.role === 'owner');
+    const myCurrentRole = meEntry?.role || 'viewer';
     const alreadyRequested = meEntry?.admin_requested || false;
+    const isAlreadyAdmin = myCurrentRole === 'admin' || myCurrentRole === 'owner';
 
     const renderSimpleRow = (m, isHighlighted = false) => {
         const initial = (m.email || '?')[0].toUpperCase();
@@ -677,22 +679,38 @@ function buildMemberPanel(orgId, panel) {
         .map(m => renderSimpleRow(m))
         .join('');
 
-    const requestBtn = `
-        <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid #e2e8f0;">
-            <button id="btn-request-admin-${orgId}"
-                onclick="requestAdminAccess('${orgId}')"
-                ${alreadyRequested ? 'disabled' : ''}
-                style="width:100%;display:flex;align-items:center;justify-content:center;gap:0.5rem;
-                       padding:0.55rem 1rem;border-radius:8px;font-size:0.82rem;font-weight:600;
-                       cursor:${alreadyRequested ? 'default' : 'pointer'};
-                       border:1px solid ${alreadyRequested ? '#d1fae5' : 'var(--secondary)'};
-                       background:${alreadyRequested ? '#f0fdf4' : 'transparent'};
-                       color:${alreadyRequested ? '#16a34a' : 'var(--secondary)'};
-                       transition:all 0.15s;">
-                <i data-lucide="${alreadyRequested ? 'check-circle' : 'shield-plus'}" style="width:15px;height:15px;"></i>
-                ${alreadyRequested ? 'Admin Access Requested ✓' : 'Request Admin Access'}
-            </button>
-        </div>`;
+    // 3-state admin request button:
+    //  1. Not requested + not admin → "Request Admin Access" (purple, clickable)
+    //  2. Requested, waiting        → "Admin Access Pending" (amber, disabled)
+    //  3. Already admin/owner       → hidden entirely
+    let requestBtn = '';
+    if (!isAlreadyAdmin) {
+        if (alreadyRequested) {
+            requestBtn = `
+            <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid #e2e8f0;">
+                <button id="btn-request-admin-${orgId}" disabled
+                    style="width:100%;display:flex;align-items:center;justify-content:center;gap:0.5rem;
+                           padding:0.55rem 1rem;border-radius:8px;font-size:0.82rem;font-weight:600;
+                           cursor:default;border:1px solid #fde68a;background:#fefce8;color:#92400e;">
+                    <i data-lucide="clock" style="width:15px;height:15px;"></i>
+                    Admin Access Pending
+                </button>
+            </div>`;
+        } else {
+            requestBtn = `
+            <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid #e2e8f0;">
+                <button id="btn-request-admin-${orgId}"
+                    onclick="requestAdminAccess('${orgId}')"
+                    style="width:100%;display:flex;align-items:center;justify-content:center;gap:0.5rem;
+                           padding:0.55rem 1rem;border-radius:8px;font-size:0.82rem;font-weight:600;
+                           cursor:pointer;border:1px solid var(--secondary);background:transparent;
+                           color:var(--secondary);transition:all 0.15s;">
+                    <i data-lucide="shield-plus" style="width:15px;height:15px;"></i>
+                    Request Admin Access
+                </button>
+            </div>`;
+        }
+    }
 
     panel.innerHTML = myRow
         + (ownerRows ? `<div style="font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin:0.65rem 0 0.35rem;">Organization Owner</div>` + ownerRows : '')
