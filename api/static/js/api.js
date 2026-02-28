@@ -49,17 +49,3 @@ export async function joinOrgAPI(invite_code) {
 export async function fetchOrgMembersAPI(orgId) {
     return fetch(`/api/orgs/${orgId}/members`);
 }
-
-export async function updateOrgAPI(orgId, data) {
-    return fetch(`/api/orgs/${orgId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
-}
-
-export async function deleteOrgAPI(orgId) {
-    return fetch(`/api/orgs/${orgId}`, {
-        method: 'DELETE'
-    });
-}

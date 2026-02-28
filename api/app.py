@@ -188,8 +188,6 @@ def get_user_orgs():
             'name': org.get('name', ''),
             'role': role,
             'invite_code': org.get('invite_code') if role in ('owner', 'admin') else None,
-            'logo_url': org.get('logo_url'),
-            'color': org.get('color')
         })
 
     return jsonify({'orgs': orgs}), 200
@@ -285,54 +283,6 @@ def get_org(org_id):
         return jsonify({'error': 'Forbidden'}), 403
 
     return jsonify({'status': 'success', 'org': org}), 200
-
-
-@app.route("/api/orgs/<org_id>", methods=["PATCH"])
-def update_org(org_id):
-    """Update organization metadata (name, color). Requires admin/owner."""
-    if not g.user:
-        return jsonify({'error': 'Authentication required'}), 401
-
-    org = user_manager.get_org(org_id)
-    if not org:
-        return jsonify({'error': 'Organization not found'}), 404
-
-    members = org.get('members', {})
-    user_role = members.get(g.user['uid'])
-    if user_role not in ('owner', 'admin') and not g.user.get('is_global_admin'):
-        return jsonify({'error': 'Insufficient permissions'}), 403
-
-    data = request.get_json() or {}
-    updates = {}
-    
-    if 'name' in data:
-        updates['name'] = data['name'].strip()
-    if 'color' in data:
-        updates['color'] = data['color'].strip()
-
-    if updates:
-        user_manager.update_organization(org_id, updates)
-
-    return jsonify({'status': 'success', 'updates': updates}), 200
-
-
-@app.route("/api/orgs/<org_id>", methods=["DELETE"])
-def delete_org(org_id):
-    """Delete an organization entirely. Requires owner."""
-    if not g.user:
-        return jsonify({'error': 'Authentication required'}), 401
-
-    org = user_manager.get_org(org_id)
-    if not org:
-        return jsonify({'error': 'Organization not found'}), 404
-
-    members = org.get('members', {})
-    user_role = members.get(g.user['uid'])
-    if user_role != 'owner' and not g.user.get('is_global_admin'):
-        return jsonify({'error': 'Only the owner can delete the organization'}), 403
-
-    user_manager.delete_organization(org_id)
-    return jsonify({'status': 'success', 'message': 'Organization deleted'}), 200
 
 
 @app.route("/api/orgs/<org_id>/members", methods=["GET"])

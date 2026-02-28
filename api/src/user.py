@@ -1,9 +1,5 @@
 from firebase_admin import firestore
 from extensions import db
-import random
-
-# Predefined professional palette
-ORG_COLORS = ['#635bff', '#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899']
 
 class User:
     def __init__(self, db_instance=None, admin_emails=None):
@@ -85,7 +81,6 @@ class User:
         org_data = {
             'name': org_name,
             'created_at': firestore.SERVER_TIMESTAMP,
-            'color': random.choice(ORG_COLORS),
             'members': {
                 creator_uid: 'owner'  # Roles: owner, admin, member
             }
@@ -136,29 +131,3 @@ class User:
         if user_data:
             return user_data.get('organizations', [])
         return []
-
-    def update_organization(self, org_id, data):
-        """Updates organization metadata (e.g., name, color)."""
-        self.orgs_coll.document(org_id).update(data)
-
-    def delete_organization(self, org_id):
-        """Deletes an organization and removes it from all members' lists."""
-        org_doc = self.orgs_coll.document(org_id).get()
-        if not org_doc.exists:
-            return
-
-        members = org_doc.to_dict().get('members', {})
-        
-        # 1. Remove org reference from all users
-        for uid in members.keys():
-            self.users_coll.document(uid).update({
-                'organizations': firestore.ArrayRemove([org_id])
-            })
-
-        # 2. Delete the organization document
-        self.orgs_coll.document(org_id).delete()
-        
-        # 3. Cleanup events associated with this org
-        events = self.db.collection('events').where('org_id', '==', org_id).stream()
-        for event in events:
-            event.reference.delete()

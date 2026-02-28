@@ -1,5 +1,5 @@
 import { db, auth, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, onAuthStateChanged, signOut } from './firebase-config.js';
-import { fetchUserOrgs, setMemberRoleAPI, createOrgAPI, joinOrgAPI, fetchOrgMembersAPI, updateOrgAPI, deleteOrgAPI } from './api.js';
+import { fetchUserOrgs, setMemberRoleAPI, createOrgAPI, joinOrgAPI, fetchOrgMembersAPI } from './api.js';
 import { renderDashboard, updateOrgSwitcher, renderMyOrgsPanel, buildMemberPanel, showToast } from './ui-render.js';
 import { openCalendarModal } from './calendar.js';
 import { editEventModal, createEventModal } from './admin.js';
@@ -67,7 +67,6 @@ window.toggleOrgCard = async (orgId) => {
     if (!isOpen) {
         panel.style.display = 'block';
         card.querySelector('.org-card-expand-icon').style.transform = 'rotate(180deg)';
-        const listContainer = document.getElementById(`member-list-${orgId}`);
         if (!_memberCache[orgId]) {
             const res = await fetchOrgMembersAPI(orgId);
             if (res.ok) {
@@ -75,7 +74,7 @@ window.toggleOrgCard = async (orgId) => {
                 _memberCache[orgId] = data.members;
             }
         }
-        buildMemberPanel(orgId, listContainer, _memberCache[orgId] || [], state.userOrgs);
+        buildMemberPanel(orgId, panel, _memberCache[orgId] || [], state.userOrgs);
     }
 };
 
@@ -88,37 +87,6 @@ window.setMemberRole = async (orgId, uid, role) => {
             document.querySelectorAll('.org-member-panel').forEach(p => p.style.display = 'none');
             window.toggleOrgCard(orgId);
             showToast("Role updated");
-        }
-    } catch (e) { console.error(e); }
-};
-
-window.updateOrgColor = async (orgId, color) => {
-    try {
-        const res = await updateOrgAPI(orgId, { color });
-        if (res.ok) {
-            const orgData = await fetchUserOrgs();
-            state.userOrgs = orgData.orgs || [];
-            renderMyOrgsPanel(state.userOrgs);
-            renderDashboard(state);
-            showToast("Color updated");
-        }
-    } catch (e) { console.error(e); }
-};
-
-window.deleteOrganization = async (orgId, name) => {
-    if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) return;
-    try {
-        const res = await deleteOrgAPI(orgId);
-        if (res.ok) {
-            const orgData = await fetchUserOrgs();
-            state.userOrgs = orgData.orgs || [];
-            updateOrgSwitcher(state.userOrgs);
-            renderMyOrgsPanel(state.userOrgs);
-            renderDashboard(state);
-            showToast("Organization deleted");
-        } else {
-            const data = await res.json();
-            showToast(data.error || "Failed to delete", "error");
         }
     } catch (e) { console.error(e); }
 };

@@ -2,8 +2,7 @@ import { auth } from './firebase-config.js';
 
 const ORG_COLORS = ['#635bff', '#0ea5e9', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
 
-export function getOrgColor(name, storedColor) {
-    if (storedColor) return storedColor;
+export function getOrgColor(name) {
     let hash = 0;
     for (let c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash);
     return ORG_COLORS[Math.abs(hash) % ORG_COLORS.length];
@@ -58,7 +57,7 @@ export function renderDashboard(state) {
                         <tr onclick="window.toggleOrgExpansion('${org.id}')" style="background: var(--background); cursor: pointer; transition: all 0.2s; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                             <td style="padding: 1rem; border-top-left-radius: 8px; border-bottom-left-radius: 8px;">
                                 <div style="display: flex; align-items: center; gap: 1rem;">
-                                    <div style="width: 32px; height: 32px; border-radius: 8px; background:${getOrgColor(org.name || org.id, org.color)}; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">${(org.name || '?')[0].toUpperCase()}</div>
+                                    <div style="width: 32px; height: 32px; border-radius: 8px; background:${getOrgColor(org.name || org.id)}; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">${(org.name || '?')[0].toUpperCase()}</div>
                                     <span style="font-weight: 600; color: var(--text-dark);">${org.name}</span>
                                 </div>
                             </td>
@@ -137,10 +136,9 @@ export function renderMyOrgsPanel(userOrgs) {
 
     container.innerHTML = userOrgs.map(org => {
         const initial = (org.name || '?')[0].toUpperCase();
-        const color = getOrgColor(org.name || org.id, org.color);
+        const color = getOrgColor(org.name || org.id);
         const role = org.role || 'viewer';
         const canManage = ['owner', 'admin'].includes(role);
-        const isOwner = role === 'owner';
         const codeChip = org.invite_code
             ? `<span style="font-size:0.7rem;color:#94a3b8;margin-left:0.35rem;">· <code style="color:var(--secondary);letter-spacing:0.06em;">${org.invite_code}</code></span>`
             : '';
@@ -159,33 +157,9 @@ export function renderMyOrgsPanel(userOrgs) {
                 <i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px; transition: transform 0.2s;"></i>
             </div>
             <div class="org-member-panel" id="org-member-panel-${org.id}" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
-                ${canManage ? `
-                <div style="margin-bottom: 1.5rem; display: flex; align-items: flex-start; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #e2e8f0;">
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.25rem;">Brand Color</label>
-                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                            ${ORG_COLORS.map(c => `
-                                <div onclick="event.stopPropagation(); window.updateOrgColor('${org.id}', '${c}')" 
-                                     style="width: 20px; height: 20px; border-radius: 4px; background: ${c}; cursor: pointer; border: 2px solid ${c === org.color ? 'var(--primary)' : 'transparent'};">
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    ${isOwner ? `
-                    <div style="flex-shrink: 0;">
-                        <button class="btn btn-alert btn-sm" onclick="event.stopPropagation(); window.deleteOrganization('${org.id}', '${org.name.replace(/'/g, "\\'")}')" style="padding: 0.3rem 0.6rem; font-size: 0.7rem;">
-                            <i data-lucide="trash-2" style="width:12px;height:12px;"></i> Delete
-                        </button>
-                    </div>
-                    ` : ''}
-                </div>
-                                    ` : ''}
-                                <div id="member-list-${org.id}">
-                                    <div class="member-skeleton" style="height: 50px; background: var(--surface); border-radius: 8px;"></div>
-                                </div>
-                            </div>
-                        </div>`;
-                
+                <div class="member-skeleton" style="height: 50px; background: #f1f5f9; border-radius: 8px;"></div>
+            </div>
+        </div>`;
     }).join('');
     if (window.lucide) window.lucide.createIcons();
 }
