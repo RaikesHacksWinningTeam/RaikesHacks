@@ -5,19 +5,16 @@ Login
 {% endblock %}
 
 {% block main %}
-
-<body>
-    <main class="container py-5 text-center">
-        <div>
-            <h1>Login Page</h1>
-        </div>
-        <div>
-            <button id="google-signin-btn">Sign in with Google</button>
-        </div>
-    </main>
-    <script>
-        window.firebaseConfig = {{ firebase_config | tojson }};
-    </script>
-    <script type="module" src="{{ url_for('static', filename='js/login.js') }}" defer></script>
-</body>
+<main class="container py-5 text-center">
+    <div>
+        <h1>Login Page</h1>
+    </div>
+    <div>
+        <button id="google-signin-btn">Sign in with Google</button>
+    </div>
+</main>
+<script id="firebase-config" type="application/json">
+    {{ firebase_config | tojson | safe }}
+</script>
+<script type="module" src="{{ url_for('static', filename='js/login.js') }}" defer></script>
 {% endblock %}
