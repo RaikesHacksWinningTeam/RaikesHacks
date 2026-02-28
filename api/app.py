@@ -2,6 +2,9 @@ import datetime
 from flask import Flask, render_template, request, jsonify
 import firebase_admin
 from firebase_admin import credentials, auth, firestore, db
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 cred = credentials.Certificate(".auth/raikeshacks.json")
 firebase_admin.initialize_app(cred)
@@ -18,9 +21,18 @@ app = Flask(__name__)
 def index():
     return render_template("index.html")
 
+
 @app.route("/login")
 def login():
-    return render_template("login.html")
+    firebase_config = {
+        "apiKey": os.getenv("FIREBASE_API_KEY"),
+        "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN"),
+        "projectId": os.getenv("FIREBASE_PROJECT_ID"),
+        "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET"),
+        "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID"),
+        "appId": os.getenv("FIREBASE_APP_ID")
+    }
+    return render_template("login.html", firebase_config=firebase_config)
 
 @app.route('/api/auth/google', methods=['POST'])
 def verify_google_token():
