@@ -41,41 +41,36 @@
                         <i data-lucide="plus"></i>
                         Create Event
                     </button>
-                    <a href="/login" class="user-avatar" id="btn-login-page" title="Admin Login">
-                        <i data-lucide="user"></i>
+                    <a href="/login" class="btn btn-secondary" id="btn-login-page">
+                        <i data-lucide="log-in"></i>
+                        Login
                     </a>
-                    <button class="btn btn-secondary hidden" id="btn-logout" title="Logout">
+                    <button class="btn btn-outline hidden" id="btn-logout" title="Logout">
                         <i data-lucide="log-out"></i>
+                        Logout
                     </button>
                 </div>
             </header>
 
-            <div id="floor-plan-container" class="floor-plan-container">
-                <!-- SVG will be injected here by D3 -->
+            <div id="org-dashboard-container" class="org-dashboard-container">
+                <!-- Org table will be injected here by JS -->
+                <div class="loading-state">
+                    <i data-lucide="loader-2" class="animate-spin"></i>
+                    <p>Loading organizations and events...</p>
+                </div>
             </div>
 
             <footer class="timeline-bar">
                 <div class="timeline-info">
                     <span class="timeline-title">Timeline Explorer</span>
-                    <span class="timeline-subtitle">Drag to view upcoming shifts</span>
+                    <span class="timeline-subtitle">View scheduled events</span>
                 </div>
-                <input type="range" id="timeline-slider" min="0" max="24" value="0" step="1">
                 <div class="timeline-legend">
-                    <span class="timeline-title">Next 24 Hours</span>
-                    <span class="timeline-subtitle">Real-time updates active</span>
+                    <span class="timeline-title">Real-time Dashboard</span>
+                    <span class="timeline-subtitle">Automatically updating</span>
                 </div>
             </footer>
         </main>
-
-        <aside id="side-panel" class="sidebar">
-            <div id="side-panel-empty" class="side-panel-placeholder">
-                <i data-lucide="calendar" class="placeholder-icon"></i>
-                <p>Select a room to see details</p>
-            </div>
-            <div id="side-panel-content" class="side-panel-content hidden">
-                <!-- Room details injected by JS -->
-            </div>
-        </aside>
     </div>
 
     <!-- Admin Modal -->
@@ -95,6 +90,12 @@
                         <input type="text" id="event-title" placeholder="e.g., Finals Prep Session" required>
                     </div>
                     <div class="form-group" id="event-org-group">
+                        <label>Organization</label>
+                        <select id="event-org" required>
+                            <!-- Options injected by JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Organization</label>
                         <select id="event-org" required>
                             <!-- Options injected by JS -->
@@ -214,6 +215,36 @@
                 </div>
 
             </div><!-- /.org-modal-body -->
+        </div>
+    </div>
+
+    <!-- Calendar Modal -->
+    <div id="calendar-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add to Calendar</h2>
+                <button class="btn-close" id="btn-close-calendar-modal">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: #64748b; font-size: 0.9rem;">
+                    Copy the link below and paste it into your calendar application (like Google Calendar, Apple Calendar, or Outlook) to add this event.
+                </p>
+                <div class="form-group">
+                    <label>Calendar Link (.ics)</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="calendar-link-input" readonly style="flex: 1; background: #f8fafc; cursor: text;">
+                        <button class="btn btn-primary" id="btn-copy-calendar-link" title="Copy to clipboard">
+                            <i data-lucide="copy" style="width: 18px; height: 18px;"></i>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btn-close-calendar-modal-footer">Close</button>
+            </div>
         </div>
     </div>
 
