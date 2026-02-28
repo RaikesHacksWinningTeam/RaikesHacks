@@ -198,13 +198,13 @@ function updateSidePanel() {
                 <i data-lucide="users"></i> Capacity: ${room.capacity}
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem;">
-                ${room.tags.map(tag => `<span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">${tag}</span>`).join('')}
+                ${room.tags.map(tag => `<span style="background: var(--surface); border: 1px solid var(--border); color: #475569; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">${tag}</span>`).join('')}
             </div>
         </div>
         <section>
             <h3 style="font-size: 0.9rem; font-weight: bold; text-transform: uppercase; color: #94a3b8; margin-bottom: 1rem;">Events</h3>
             ${roomEvents.length === 0 ? '<p style="color: #94a3b8;">No events scheduled</p>' : roomEvents.map(e => `
-                <div style="padding: 1rem; background: #ffffff; border-radius: 12px; margin-bottom: 1rem; border: 1px solid #e2e8f0; border-left: 4px solid var(--secondary); position: relative;">
+                <div style="padding: 1rem; background: #ffffff; border-radius: 4px; margin-bottom: 1rem; border: 1px solid #e2e8f0; border-left: 4px solid var(--secondary); position: relative;">
                     <div style="font-weight: 700; color: var(--text-dark);">${e.title}</div>
                     <div style="font-size: 0.8rem; color: #64748b;">${new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(e.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     <div style="font-size: 0.8rem; margin-top: 0.5rem;">By: ${e.organizer}</div>
@@ -736,7 +736,7 @@ if (createOrgForm) {
         if (!name) return;
 
         btnCreateSubmit.disabled = true;
-        btnCreateSubmit.innerHTML = '<i data-lucide="loader-2"></i> Creating…';
+        btnCreateSubmit.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Creating…';
         lucide.createIcons();
 
         try {
@@ -802,7 +802,7 @@ if (joinOrgForm) {
         if (!rawCode) return;
 
         btnJoinSubmit.disabled = true;
-        btnJoinSubmit.innerHTML = '<i data-lucide="loader-2"></i> Joining…';
+        btnJoinSubmit.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Joining…';
         lucide.createIcons();
 
         try {
