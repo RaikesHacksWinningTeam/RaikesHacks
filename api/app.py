@@ -359,6 +359,104 @@ def assign_org_member(org_id):
     return jsonify({'status': 'success', 'org_id': org_id, 'uid': target_uid, 'role': role}), 200
 
 
+
+# --- Event API Routes (org-gated) ---
+
+def _user_is_org_member(uid, org_id):
+    """Return True if uid is a member of the given org."""
+    org = user_manager.get_org(org_id)
+    if not org:
+        return False
+    return uid in org.get('members', {})
+
+
+@app.route("/api/events", methods=["POST"])
+def create_event():
+    """Create a new event. Caller must be a member of the specified org."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    data = request.get_json() or {}
+    org_id   = (data.get('org_id') or '').strip()
+    title    = (data.get('title') or '').strip()
+    room_id  = (data.get('room_id') or '').strip()
+    start    = (data.get('start') or '').strip()
+    end      = (data.get('end') or '').strip()
+
+    if not all([org_id, title, room_id, start, end]):
+        return jsonify({'error': 'org_id, title, room_id, start and end are required'}), 400
+
+    if not _user_is_org_member(g.user['uid'], org_id) and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'You must be a member of the organization to create events'}), 403
+
+    event_data = {
+        'org_id':     org_id,
+        'created_by': g.user['uid'],
+        'title':      title,
+        'room_id':    room_id,
+        'start':      start,
+        'end':        end,
+        'type':       data.get('type', 'general'),
+        'organizer':  g.user['email'],
+        'status':     'scheduled',
+        'createdAt':  firestore.SERVER_TIMESTAMP,
+    }
+
+    ref = db.collection('events').add(event_data)
+    # ref is a tuple (update_time, DocumentReference) in firebase-admin SDK
+    doc_ref = ref[1] if isinstance(ref, tuple) else ref
+    return jsonify({'status': 'success', 'event_id': doc_ref.id}), 201
+
+
+@app.route("/api/events/<event_id>", methods=["PUT"])
+def update_event(event_id):
+    """Update an event. Caller must be a member of the event's org."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    event_doc = db.collection('events').document(event_id).get()
+    if not event_doc.exists:
+        return jsonify({'error': 'Event not found'}), 404
+
+    event = event_doc.to_dict()
+    org_id = event.get('org_id', '')
+
+    if not _user_is_org_member(g.user['uid'], org_id) and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'You must be a member of the organization to edit events'}), 403
+
+    data = request.get_json() or {}
+    updates = {}
+    for field in ('title', 'room_id', 'start', 'end', 'type', 'status'):
+        if field in data:
+            updates[field] = data[field]
+
+    if not updates:
+        return jsonify({'error': 'No fields to update'}), 400
+
+    db.collection('events').document(event_id).update(updates)
+    return jsonify({'status': 'success', 'event_id': event_id}), 200
+
+
+@app.route("/api/events/<event_id>", methods=["DELETE"])
+def delete_event(event_id):
+    """Delete an event. Caller must be a member of the event's org."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    event_doc = db.collection('events').document(event_id).get()
+    if not event_doc.exists:
+        return jsonify({'error': 'Event not found'}), 404
+
+    event = event_doc.to_dict()
+    org_id = event.get('org_id', '')
+
+    if not _user_is_org_member(g.user['uid'], org_id) and not g.user.get('is_global_admin'):
+        return jsonify({'error': 'You must be a member of the organization to delete events'}), 403
+
+    db.collection('events').document(event_id).delete()
+    return jsonify({'status': 'success', 'event_id': event_id}), 200
+
+
 # --- Error Handlers ---
 @app.errorhandler(404)
 def page_not_found(e):

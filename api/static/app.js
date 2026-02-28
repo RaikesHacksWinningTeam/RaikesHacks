@@ -3,8 +3,8 @@ const firebaseConfig = window.firebaseConfig;
 
 // Import Firebase SDK (Modular v10+)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signOut, getIdToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // Initialize Firebase
 let db;
@@ -184,6 +184,7 @@ function updateSidePanel() {
 
     const roomEvents = events.filter(e => e.room_id === room.id);
     const isLoggedIn = auth.currentUser !== null;
+    const canEditEvents = isOrgMember();
 
     sidePanelContent.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
@@ -208,11 +209,12 @@ function updateSidePanel() {
                     <div style="font-weight: 700; color: var(--text-dark);">${e.title}</div>
                     <div style="font-size: 0.8rem; color: #64748b;">${new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(e.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     <div style="font-size: 0.8rem; margin-top: 0.5rem;">By: ${e.organizer}</div>
-                    ${isLoggedIn ? `
-                        <button onclick="editEvent('${e.id}')" style="position: absolute; top: 0.5rem; right: 0.5rem; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;" title="Edit Event">
-                            <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
-                        </button>
-                    ` : ''}
+                     <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.25rem;">${e.org_id ? `Org: ${(userOrgs.find(o => o.id === e.org_id) || {}).name || e.org_id}` : ''}</div>
+                     ${canEditEvents && userOrgs.some(o => o.id === e.org_id) ? `
+                         <button onclick="editEvent('${e.id}')" style="position: absolute; top: 0.5rem; right: 0.5rem; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.25rem;" title="Edit Event">
+                             <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+                         </button>
+                     ` : ''}
                 </div>
             `).join('')}
         </section>
@@ -234,6 +236,10 @@ window.editEvent = (eventId) => {
     console.log("Set hidden input event-id to:", document.getElementById('event-id').value);
     document.getElementById('event-title').value = event.title;
     document.getElementById('event-room').innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id === event.room_id ? 'selected' : ''}>${r.name}</option>`).join('');
+
+    // Populate org select — pre-select the event's org if present
+    const orgSelect = document.getElementById('event-org');
+    orgSelect.innerHTML = userOrgs.map(o => `<option value="${o.id}" ${o.id === event.org_id ? 'selected' : ''}>${o.name}</option>`).join('');
 
     const startStr = new Date(event.start).toTimeString().slice(0, 5);
     const endStr = new Date(event.end).toTimeString().slice(0, 5);
@@ -261,12 +267,18 @@ function updateTimeDisplay() {
 
 // --- Admin Modal Logic ---
 document.getElementById('btn-create-event').onclick = () => {
+    if (!isOrgMember()) {
+        alert('You must belong to an organization to create events.');
+        return;
+    }
     document.getElementById('modal-title').textContent = 'Create New Event';
     document.getElementById('event-id').value = '';
     document.getElementById('event-title').value = '';
     document.getElementById('event-start').value = '';
     document.getElementById('event-end').value = '';
     document.getElementById('btn-delete-event').classList.add('hidden');
+    // Populate org select
+    document.getElementById('event-org').innerHTML = userOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
     adminModal.classList.remove('hidden');
     eventRoomSelect.innerHTML = rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
 };
@@ -280,24 +292,32 @@ document.getElementById('btn-delete-event').onclick = async () => {
 
     if (confirm('Are you sure you want to delete this event?')) {
         try {
-            await deleteDoc(doc(db, "events", eventId));
+            const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to delete event');
             adminModal.classList.add('hidden');
         } catch (error) {
             console.error("Error deleting event:", error);
-            alert("Failed to delete event.");
+            alert(error.message || 'Failed to delete event.');
         }
     }
 };
 
+// --- Helper: is current user a member of at least one org? ---
+function isOrgMember() {
+    return userOrgs.length > 0;
+}
+
 eventForm.onsubmit = async (e) => {
     e.preventDefault();
-    if (!db) {
-        alert("Firestore not initialized. Update firebaseConfig in app.js.");
+
+    if (!isOrgMember()) {
+        alert('You must belong to an organization to create or edit events.');
         return;
     }
 
     const eventId = document.getElementById('event-id').value;
-    console.log("OnSubmit eventId:", eventId);
+    const orgId = document.getElementById('event-org').value;
     const startTimeValue = document.getElementById('event-start').value;
     const endTimeValue = document.getElementById('event-end').value;
 
@@ -309,31 +329,38 @@ eventForm.onsubmit = async (e) => {
     const [endH, endM] = endTimeValue.split(':');
     endDate.setHours(parseInt(endH), parseInt(endM), 0, 0);
 
-    const eventData = {
+    const payload = {
+        org_id: orgId,
         room_id: document.getElementById('event-room').value,
         title: document.getElementById('event-title').value,
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         type: 'general',
-        organizer: 'Staff',
-        status: 'scheduled'
     };
 
     try {
+        let res;
         if (eventId) {
-            console.log("Updating document:", eventId);
-            // Update existing
-            await updateDoc(doc(db, "events", eventId), eventData);
+            // Update via Flask API
+            res = await fetch(`/api/events/${eventId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
         } else {
-            console.log("Creating new document");
-            // Create new
-            eventData.createdAt = serverTimestamp();
-            await addDoc(collection(db, "events"), eventData);
+            // Create via Flask API
+            res = await fetch('/api/events', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
         }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to save event');
         adminModal.classList.add('hidden');
     } catch (error) {
-        console.error("Error saving event:", error);
-        alert("Failed to save event to Firestore.");
+        console.error('Error saving event:', error);
+        alert(error.message || 'Failed to save event.');
     }
 };
 
@@ -411,6 +438,14 @@ async function fetchUserOrgs() {
         userOrgs = data.orgs || [];
         renderMyOrgsPanel();
         updateOrgSwitcher();
+
+        // Show/hide the Create Event button based on org membership
+        const createBtn = document.getElementById('btn-create-event');
+        if (createBtn) {
+            createBtn.classList.toggle('hidden', userOrgs.length === 0);
+        }
+        // Refresh side panel so edit buttons reflect new org state
+        if (selectedRoomId) updateSidePanel();
     } catch (e) {
         console.warn('Could not load orgs:', e);
     }
@@ -774,7 +809,8 @@ onAuthStateChanged(auth, (user) => {
 
     if (user) {
         window._currentUid = user.uid; // used by member panel to label "(you)"
-        createBtn?.classList.remove('hidden');
+        // Keep create button hidden until we confirm org membership below
+        createBtn?.classList.add('hidden');
         loginLink?.classList.add('hidden');
         logoutBtn?.classList.remove('hidden');
         orgSwitcher?.classList.remove('hidden');
@@ -786,5 +822,7 @@ onAuthStateChanged(auth, (user) => {
         logoutBtn?.classList.add('hidden');
         orgSwitcher?.classList.add('hidden');
         userOrgs = [];
+        // Refresh side panel so edit buttons disappear
+        if (selectedRoomId) updateSidePanel();
     }
 });

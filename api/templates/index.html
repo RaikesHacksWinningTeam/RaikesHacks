@@ -94,6 +94,12 @@
                         <label>Event Title</label>
                         <input type="text" id="event-title" placeholder="e.g., Finals Prep Session" required>
                     </div>
+                    <div class="form-group" id="event-org-group">
+                        <label>Organization</label>
+                        <select id="event-org" required>
+                            <!-- Options injected by JS -->
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label>Room</label>
                         <select id="event-room" required>
@@ -110,7 +116,8 @@
                             <input type="time" id="event-end" required>
                         </div>
                     </div>
-                    <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="modal-footer"
+                        style="display: flex; justify-content: space-between; align-items: center;">
                         <button type="button" class="btn btn-alert hidden" id="btn-delete-event">
                             <i data-lucide="trash-2"></i>
                             Delete Event
