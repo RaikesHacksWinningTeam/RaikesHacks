@@ -446,7 +446,7 @@ function buildMemberPanel(orgId, panel) {
 
 async function setMemberRole(orgId, uid, role) {
     try {
-        const res = await fetch(`/api/orgs/${orgId}/members`, {
+        let res = await fetch(`/api/orgs/${orgId}/members`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uid, role })

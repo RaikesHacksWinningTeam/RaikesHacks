@@ -25,7 +25,7 @@ document.getElementById('btn-google-login').addEventListener('click', () => {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                window.location.href = '/';
+                window.location.href = data.redirect_url || '/';
             } else {
                 alert("Auth failed: " + data.message);
             }

@@ -22,7 +22,11 @@ class User:
         return None
 
     def save_user(self, uid, email):
-        """Create or update user in Firestore. Only sets default role if not existing."""
+        """Create or update user in Firestore. Only sets default role if not existing.
+        
+        Returns:
+            dict: The updated user document data.
+        """
         user_ref = self.users_coll.document(uid)
         doc = user_ref.get()
 
@@ -42,6 +46,9 @@ class User:
             data['role'] = 'admin'
 
         user_ref.set(data, merge=True)
+        
+        # Return current state to help caller decide if onboarding is needed
+        return user_ref.get().to_dict()
 
     def assign_role(self, uid, role):
         """Assign a global role to a user (legacy / super-admin use)."""
