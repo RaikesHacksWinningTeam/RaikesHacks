@@ -27,18 +27,15 @@
                         <span id="display-time">Loading...</span>
                         <input type="date" id="dashboard-date-picker" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
                     </div>
+                    <button id="theme-toggle" class="btn btn-secondary" title="Toggle Dark/Light Mode" style="padding: 0.5rem; width: 40px; height: 40px;">
+                        <i data-lucide="moon" id="theme-toggle-icon"></i>
+                    </button>
                 </div>
                 <div class="header-right">
                     <button class="org-switcher hidden" id="btn-open-org-modal" title="Manage Organizations">
                         <i data-lucide="building-2"></i>
                         <span id="org-switcher-label">My Orgs</span>
                     </button>
-                    <div id="alert-controls" class="alert-controls">
-                        <button class="btn btn-alert" id="btn-emergency">
-                            <i data-lucide="bell"></i>
-                            Alerts
-                        </button>
-                    </div>
                     <button class="btn btn-primary" id="btn-create-event">
                         <i data-lucide="plus"></i>
                         Create Event

@@ -70,7 +70,7 @@ export function renderDashboard(state) {
 
     if (state.allOrganizations.length === 0) {
         container.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 4rem; color: #94a3b8;">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 4rem; color: var(--text);">
                 <i data-lucide="building-2" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
                 <p>No organizations found.</p>
             </div>`;
@@ -173,7 +173,7 @@ export function renderDashboard(state) {
     // Time header (16 segments for 6 AM to 10 PM)
     for (let i = 0; i < 16; i++) {
         const h = document.createElement('div');
-        h.style.cssText = `flex: 1; font-size: 0.7rem; font-weight: 700; color: #94a3b8; text-align: center;`;
+        h.style.cssText = `flex: 1; font-size: 0.7rem; font-weight: 700; color: var(--text); text-align: center;`;
 
         // Offset by 6 hours to start at 6 AM
         const hour = i + 6;
@@ -468,18 +468,18 @@ export function renderMyOrgsPanel(userOrgs) {
                     <div class="org-avatar" style="background:${color}; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">${initial}</div>
                     <div class="org-card-info" style="flex: 1;">
                         <div class="org-card-name" style="font-weight: 700;">${org.name}${codeChip}</div>
-                        <div class="org-card-role" id="org-member-count-${org.id}" style="font-size: 0.75rem; color: #94a3b8;">
+                        <div class="org-card-role" id="org-member-count-${org.id}" style="font-size: 0.75rem; color: var(--text);">
                             ${canManage ? 'Manage members' : 'View members'}
                         </div>
                     </div>
                     <span class="role-badge ${role}">${role}</span>
                     <i data-lucide="chevron-down" class="org-card-expand-icon" style="width:16px;height:16px; transition: transform 0.2s;"></i>
                 </div>
-                <div class="org-member-panel" id="org-member-panel-${org.id}" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+                <div class="org-member-panel" id="org-member-panel-${org.id}" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
                     ${canManage ? `
-                    <div style="margin-bottom: 1.5rem; display: flex; align-items: flex-start; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #e2e8f0;">
+                    <div style="margin-bottom: 1.5rem; display: flex; align-items: flex-start; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed var(--border);">
                         <div style="flex: 1;">
-                            <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.25rem;">Brand Color</label>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 700; color: var(--text); text-transform: uppercase; margin-bottom: 0.25rem;">Brand Color</label>
                             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
                                 ${ORG_COLORS.map(c => `
                                     <div onclick="event.stopPropagation(); window.updateOrgColor('${org.id}', '${c}')" 
