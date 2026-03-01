@@ -505,6 +505,100 @@ def get_multi_org_calendar_feed():
     )
 
 
+@app.route("/api/user/sync-prefs", methods=["GET", "POST"])
+def manage_sync_prefs():
+    """Returns or updates the synced organizations and token for the user."""
+    if not g.user:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    uid = g.user['uid']
+    token = user_manager.get_calendar_token(uid)
+    
+    if request.method == "POST":
+        data = request.get_json() or {}
+        org_ids = data.get('orgs', [])
+        synced_orgs = user_manager.set_synced_orgs(uid, org_ids)
+    else:
+        synced_orgs = user_manager.get_synced_orgs(uid)
+        
+    return jsonify({
+        'token': token,
+        'synced_orgs': synced_orgs
+    }), 200
+
+
+@app.route("/api/feeds/<token>.ics")
+def personal_calendar_feed(token):
+    # 1. Authenticate via token
+    user_query = db.collection('users').where('calendar_token', '==', token).limit(1).stream()
+    user_doc = next(user_query, None)
+    
+    if not user_doc:
+        return "Invalid Calendar Feed Token", 401
+        
+    user_data = user_doc.to_dict()
+    synced_orgs = user_data.get('synced_orgs', [])
+    
+    # We allow them to sync ANY organization they opted into
+    valid_org_ids = synced_orgs
+    
+    # 2. Query events (limit to valid_org_ids)
+    events = []
+    if valid_org_ids:
+        # Fetching events that match any of the user's valid synced org IDs
+        # Firestore 'in' queries are limited to 10 elements.
+        chunks = [valid_org_ids[i:i + 10] for i in range(0, len(valid_org_ids), 10)]
+        for chunk in chunks:
+            chunk_events = db.collection('events').where('org_id', 'in', chunk).stream()
+            events.extend(chunk_events)
+
+    # 3. Build the ICS String
+    # \r\n is required by the iCalendar spec
+    ics_body = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//RaikesHacks//PersonalFeed//EN",
+        "X-WR-CALNAME:My Building Events",
+        "X-PUBLISHED-TTL:PT1H",  # Tell Outlook/Apple to refresh every hour
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH"
+    ]
+
+    for doc in events:
+        e = doc.to_dict()
+        start_str = e.get('start', '')
+        end_str = e.get('end', '')
+        if not start_str or not end_str:
+            continue
+            
+        # Format timestamps: 2026-02-28T18:00:00 -> 20260228T180000Z
+        try:
+            start_fmt = start_str.replace('-', '').replace(':', '').split('.')[0].replace('Z', '') + "Z"
+            end_fmt = end_str.replace('-', '').replace(':', '').split('.')[0].replace('Z', '') + "Z"
+        except Exception:
+            continue
+        
+        ics_body.extend([
+            "BEGIN:VEVENT",
+            f"UID:{doc.id}@raikeshacks.com",
+            f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+            f"DTSTART:{start_fmt}",
+            f"DTEND:{end_fmt}",
+            f"SUMMARY:{e.get('title', 'Untitled Event')}",
+            f"LOCATION:Room {e.get('room_id', 'TBD')}",
+            f"DESCRIPTION:Org: {e.get('org_id')} | Organizer: {e.get('organizer')}",
+            "END:VEVENT"
+        ])
+
+    ics_body.append("END:VCALENDAR")
+    
+    return Response(
+        "\r\n".join(ics_body),
+        mimetype="text/calendar",
+        headers={"Content-Disposition": "attachment; filename=my_calendar.ics"}
+    )
+
+
 # --- Error Handlers ---
 @app.errorhandler(404)
 def page_not_found(e):

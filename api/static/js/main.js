@@ -98,7 +98,7 @@ window.toggleOrgCard = async (orgId) => {
     if (!card || !panel) return;
 
     const isOpen = card.classList.contains('open');
-    
+
     // Close all other cards first
     document.querySelectorAll('.org-card-expandable.open').forEach(otherCard => {
         if (otherCard.id !== `org-card-${orgId}`) {
@@ -111,7 +111,7 @@ window.toggleOrgCard = async (orgId) => {
     if (!isOpen) {
         card.classList.add('open');
         panel.style.display = 'block';
-        
+
         const listContainer = document.getElementById(`member-list-${orgId}`);
         if (!_memberCache[orgId]) {
             const res = await fetchOrgMembersAPI(orgId);
@@ -132,7 +132,7 @@ window.setMemberRole = async (orgId, uid, role) => {
         const res = await setMemberRoleAPI(orgId, uid, role);
         if (res.ok) {
             _memberCache[orgId] = null; // force reload
-            
+
             // Re-open to refresh content
             const card = document.getElementById(`org-card-${orgId}`);
             if (card) card.classList.remove('open');
@@ -153,14 +153,14 @@ window.updateOrgColor = async (orgId, color) => {
         if (res.ok) {
             const orgData = await fetchUserOrgs();
             state.userOrgs = orgData.orgs || [];
-            
+
             // Re-render dashboard and panel
             renderDashboard(state);
             renderMyOrgsPanel(state.userOrgs);
-            
+
             // Re-open this specific card immediately so it doesn't "flicker" closed
             window.toggleOrgCard(orgId);
-            
+
             showToast("Brand color updated");
         }
     } catch (e) { console.error(e); }
@@ -398,75 +398,100 @@ document.addEventListener("DOMContentLoaded", () => {
     const syncLinkContainer = document.getElementById('sync-link-container');
     const syncCalendarLinkInput = document.getElementById('sync-calendar-link-input');
     const btnCopySyncLink = document.getElementById('btn-copy-sync-link');
+    const btnSaveSyncPrefs = document.getElementById('btn-save-sync-prefs');
 
     if (btnSyncCalendar) {
-        btnSyncCalendar.onclick = () => {
+        btnSyncCalendar.onclick = async () => {
+            if (!auth?.currentUser) {
+                showToast("You must be logged in to sync your calendar.", "error");
+                return;
+            }
+
             if (!state.allOrganizations || state.allOrganizations.length === 0) {
                 showToast("No organizations available to sync.", "error");
                 return;
             }
 
-            syncOrgList.innerHTML = '';
-            syncLinkContainer.classList.add('hidden');
-            syncCalendarLinkInput.value = '';
-
-            // Add Select All checkbox
-            const selectAllLabel = document.createElement('label');
-            selectAllLabel.style.display = 'flex';
-            selectAllLabel.style.alignItems = 'center';
-            selectAllLabel.style.gap = '0.5rem';
-            selectAllLabel.style.cursor = 'pointer';
-            selectAllLabel.style.paddingBottom = '0.5rem';
-            selectAllLabel.style.marginBottom = '0.5rem';
-            selectAllLabel.style.borderBottom = '1px solid #e2e8f0';
-            selectAllLabel.style.fontWeight = 'bold';
-
-            const selectAllCheckbox = document.createElement('input');
-            selectAllCheckbox.type = 'checkbox';
-            selectAllCheckbox.id = 'sync-select-all';
-
-            const selectAllSpan = document.createElement('span');
-            selectAllSpan.textContent = 'Select All Organizations';
-
-            selectAllLabel.appendChild(selectAllCheckbox);
-            selectAllLabel.appendChild(selectAllSpan);
-            syncOrgList.appendChild(selectAllLabel);
-
-            state.allOrganizations.forEach(org => {
-                const label = document.createElement('label');
-                label.style.display = 'flex';
-                label.style.alignItems = 'center';
-                label.style.gap = '0.5rem';
-                label.style.cursor = 'pointer';
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.value = org.id;
-                checkbox.className = 'sync-org-checkbox';
-
-                // Add change listener to "Select All" checkbox instead of all individual
-                checkbox.addEventListener('change', () => {
-                    const allChecked = Array.from(document.querySelectorAll('.sync-org-checkbox')).every(cb => cb.checked);
-                    const someChecked = Array.from(document.querySelectorAll('.sync-org-checkbox')).some(cb => cb.checked);
-                    selectAllCheckbox.checked = allChecked;
-                    selectAllCheckbox.indeterminate = someChecked && !allChecked;
-                });
-
-                const span = document.createElement('span');
-                span.textContent = org.name;
-
-                label.appendChild(checkbox);
-                label.appendChild(span);
-                syncOrgList.appendChild(label);
-            });
-
-            selectAllCheckbox.addEventListener('change', (e) => {
-                document.querySelectorAll('.sync-org-checkbox').forEach(cb => {
-                    cb.checked = e.target.checked;
-                });
-            });
-
+            syncOrgList.innerHTML = '<div class="loading-state"><i data-lucide="loader-2" class="animate-spin"></i><p>Loading preferences...</p></div>';
+            syncCalendarLinkInput.value = 'Loading...';
+            if (window.lucide) window.lucide.createIcons();
             syncModal?.classList.remove('hidden');
+
+            try {
+                const res = await fetch('/api/user/sync-prefs');
+                const data = await res.json();
+                const syncedOrgs = data.synced_orgs || [];
+
+                if (data.token) {
+                    syncCalendarLinkInput.value = `${window.location.origin}/api/feeds/${data.token}.ics`;
+                }
+
+                syncOrgList.innerHTML = '';
+
+                // Add Select All checkbox
+                const selectAllLabel = document.createElement('label');
+                selectAllLabel.style.display = 'flex';
+                selectAllLabel.style.alignItems = 'center';
+                selectAllLabel.style.gap = '0.5rem';
+                selectAllLabel.style.cursor = 'pointer';
+                selectAllLabel.style.paddingBottom = '0.5rem';
+                selectAllLabel.style.marginBottom = '0.5rem';
+                selectAllLabel.style.borderBottom = '1px solid #e2e8f0';
+                selectAllLabel.style.fontWeight = 'bold';
+
+                const selectAllCheckbox = document.createElement('input');
+                selectAllCheckbox.type = 'checkbox';
+                selectAllCheckbox.id = 'sync-select-all';
+
+                const selectAllSpan = document.createElement('span');
+                selectAllSpan.textContent = 'Select All Organizations';
+
+                selectAllLabel.appendChild(selectAllCheckbox);
+                selectAllLabel.appendChild(selectAllSpan);
+                syncOrgList.appendChild(selectAllLabel);
+
+                state.allOrganizations.forEach(org => {
+                    const label = document.createElement('label');
+                    label.style.display = 'flex';
+                    label.style.alignItems = 'center';
+                    label.style.gap = '0.5rem';
+                    label.style.cursor = 'pointer';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.value = org.id;
+                    checkbox.className = 'sync-org-checkbox';
+                    checkbox.checked = syncedOrgs.includes(org.id);
+
+                    // Add change listener to "Select All" checkbox instead of all individual
+                    checkbox.addEventListener('change', () => {
+                        const allChecked = Array.from(document.querySelectorAll('.sync-org-checkbox')).every(cb => cb.checked);
+                        const someChecked = Array.from(document.querySelectorAll('.sync-org-checkbox')).some(cb => cb.checked);
+                        selectAllCheckbox.checked = allChecked;
+                        selectAllCheckbox.indeterminate = someChecked && !allChecked;
+                    });
+
+                    const span = document.createElement('span');
+                    span.textContent = org.name;
+
+                    label.appendChild(checkbox);
+                    label.appendChild(span);
+                    syncOrgList.appendChild(label);
+                });
+
+                selectAllCheckbox.addEventListener('change', (e) => {
+                    document.querySelectorAll('.sync-org-checkbox').forEach(cb => {
+                        cb.checked = e.target.checked;
+                    });
+                });
+                selectAllCheckbox.checked = state.allOrganizations.every(org => syncedOrgs.includes(org.id));
+                const someChecked = state.allOrganizations.some(org => syncedOrgs.includes(org.id));
+                selectAllCheckbox.indeterminate = someChecked && !selectAllCheckbox.checked;
+
+            } catch (e) {
+                console.error("Failed to load sync preferences:", e);
+                syncOrgList.innerHTML = '<p style="color:red">Failed to load preferences.</p>';
+            }
         };
     }
 
@@ -477,23 +502,34 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('btn-close-sync-modal-footer').onclick = () => syncModal?.classList.add('hidden');
     }
 
-    if (btnGenerateSync) {
-        btnGenerateSync.onclick = () => {
+    if (btnSaveSyncPrefs) {
+        btnSaveSyncPrefs.onclick = async () => {
             const checkboxes = document.querySelectorAll('.sync-org-checkbox:checked');
-            if (checkboxes.length === 0) {
-                showToast("Please select at least one organization.", "error");
-                return;
-            }
             const selectedOrgIds = Array.from(checkboxes).map(cb => cb.value);
 
-            if (selectedOrgIds.length === 1) {
-                const link = `${window.location.origin}/api/orgs/${selectedOrgIds[0]}/calendar.ics`;
-                syncCalendarLinkInput.value = link;
-            } else {
-                const link = `${window.location.origin}/api/calendar/multi.ics?orgs=${selectedOrgIds.join(',')}`;
-                syncCalendarLinkInput.value = link;
+            const originalText = btnSaveSyncPrefs.textContent;
+            btnSaveSyncPrefs.textContent = 'Saving...';
+            btnSaveSyncPrefs.disabled = true;
+
+            try {
+                const res = await fetch('/api/user/sync-prefs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orgs: selectedOrgIds })
+                });
+
+                if (res.ok) {
+                    showToast("Calendar sync preferences saved!");
+                } else {
+                    showToast("Failed to save preferences.", "error");
+                }
+            } catch (e) {
+                console.error(e);
+                showToast("Error saving preferences.", "error");
+            } finally {
+                btnSaveSyncPrefs.textContent = originalText;
+                btnSaveSyncPrefs.disabled = false;
             }
-            syncLinkContainer.classList.remove('hidden');
         };
     }
 

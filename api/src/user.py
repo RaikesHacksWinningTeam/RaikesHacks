@@ -1,3 +1,4 @@
+import secrets
 from firebase_admin import firestore
 from extensions import db
 
@@ -155,4 +156,35 @@ class User:
         user_data = self.get_user(uid)
         if user_data:
             return user_data.get('organizations', [])
+        return []
+
+    def get_calendar_token(self, uid):
+        """Retrieve or generate a unique 16-char token for the user."""
+        user_ref = self.users_coll.document(uid)
+        user_doc = user_ref.get()
+        
+        if not user_doc.exists:
+            return None
+            
+        user_data = user_doc.to_dict()
+        if 'calendar_token' in user_data:
+            return user_data['calendar_token']
+            
+        # Generate new if missing
+        new_token = secrets.token_urlsafe(16)
+        # We use merge=True or update
+        user_ref.update({'calendar_token': new_token})
+        return new_token
+
+    def set_synced_orgs(self, uid, org_ids):
+        """Save selected organizations for the personal calendar feed."""
+        # Allow syncing any org they choose, not just ones they are a member of
+        self.users_coll.document(uid).update({'synced_orgs': org_ids})
+        return org_ids
+        
+    def get_synced_orgs(self, uid):
+        """Get the user's selected synced organizations."""
+        user_data = self.get_user(uid)
+        if user_data:
+            return user_data.get('synced_orgs', [])
         return []
