@@ -28,7 +28,10 @@ export function editEventModal(eventId, state) {
     if (eventRoomSelect) eventRoomSelect.innerHTML = state.rooms.map(r => `<option value="${r.id}" ${r.id === event.room_id ? 'selected' : ''}>${r.name}</option>`).join('');
 
     const eventStartDate = new Date(event.start);
-    const dateStr = eventStartDate.toISOString().split('T')[0];
+    const yyyy = eventStartDate.getFullYear();
+    const mm = String(eventStartDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(eventStartDate.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
     const startStr = eventStartDate.toTimeString().slice(0, 5);
     const endStr = new Date(event.end).toTimeString().slice(0, 5);
 
@@ -76,7 +79,12 @@ export function createEventModal(state, defaultOrgId = null, defaultStart = '', 
     document.getElementById('event-start').value = defaultStart;
     document.getElementById('event-end').value = defaultEnd;
 
-    const today = new Date().toISOString().split('T')[0];
+    const targetDate = state.selectedDate || new Date();
+    const yyyy = targetDate.getFullYear();
+    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(targetDate.getDate()).padStart(2, '0');
+    const today = `${yyyy}-${mm}-${dd}`;
+
     if (eventDateInput) {
         eventDateInput.value = today;
         eventDateInput.disabled = false;
