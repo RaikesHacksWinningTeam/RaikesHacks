@@ -13,9 +13,9 @@ from icalendar import Calendar, Event
 from flask import Response
 from datetime import datetime, timedelta, timezone
 
-from extensions import db, storage_bucket
-from user import User
-from decorators import org_role_required, login_required
+from .extensions import db, storage_bucket
+from .user import User
+from .decorators import org_role_required, login_required
 
 
 # --- Initialization & Configuration ---

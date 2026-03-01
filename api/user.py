@@ -1,6 +1,6 @@
 import secrets
 from firebase_admin import firestore
-from extensions import db
+from .extensions import db
 
 class User:
     def __init__(self, db_instance=None, admin_emails=None):

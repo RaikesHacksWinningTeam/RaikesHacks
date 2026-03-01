@@ -1,7 +1,7 @@
 from functools import wraps
 from firebase_admin import auth
 from flask import jsonify, redirect, request, g, abort
-from extensions import db
+from .extensions import db
 
 
 def login_required(f):
