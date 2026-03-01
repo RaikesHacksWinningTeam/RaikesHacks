@@ -2,7 +2,7 @@
 
 A modern, multi-tenant web application for managing and viewing building events. It allows users to browse scheduled events grouped by organizations, manage organizations, assign roles, and sync event schedules with calendar applications.
 
-Link: https://raikes-hacks-toju.vercel.app/
+![Link: https://raikes-hacks-toju.vercel.app/](earlybird.png)
 
 ## Features
 
