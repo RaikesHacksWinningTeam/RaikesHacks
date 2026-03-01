@@ -13,7 +13,6 @@ from icalendar import Calendar, Event
 from flask import Response
 from datetime import datetime, timedelta, timezone
 
-from extensions import db
 from src.user import User
 
 
