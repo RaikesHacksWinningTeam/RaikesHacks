@@ -2,7 +2,7 @@
 
 A modern, multi-tenant web application for managing and viewing building events. It allows users to browse scheduled events grouped by organizations, manage organizations, assign roles, and sync event schedules with calendar applications.
 
-![Earlybird logo](earlybird.png)
+![Earlybird logo](images/earlybird.png)
 Link: https://raikes-hacks-toju.vercel.app/
 
 ## Features
