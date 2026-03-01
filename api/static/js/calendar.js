@@ -16,7 +16,15 @@ export function openCalendarModal(orgId, state) {
 
     // Set the manual copy link
     const calendarLinkInput = document.getElementById('calendar-link-input');
-    calendarLinkInput.value = httpsUrl;
+    if (calendarLinkInput) calendarLinkInput.value = httpsUrl;
+
+    // Set Google Calendar link
+    const googleBtn = document.getElementById('btn-google-calendar');
+    if (googleBtn) googleBtn.href = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(httpsUrl)}`;
+
+    // Set Apple Calendar link
+    const appleBtn = document.getElementById('btn-apple-calendar');
+    if (appleBtn) appleBtn.href = webcalUrl;
 
     document.getElementById('calendar-modal').classList.remove('hidden');
 }

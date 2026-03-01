@@ -185,7 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Theme Toggle Logic ---
     const themeToggle = document.getElementById('theme-toggle');
     const themeIcon = document.getElementById('theme-toggle-icon');
-    
+
     function applyTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('theme', theme);
@@ -423,7 +423,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 const syncedOrgs = data.synced_orgs || [];
 
                 if (data.token) {
-                    syncCalendarLinkInput.value = `${window.location.origin}/api/feeds/${data.token}.ics`;
+                    const syncUrl = `${window.location.origin}/api/feeds/${data.token}.ics`;
+                    syncCalendarLinkInput.value = syncUrl;
+
+                    const googleBtn = document.getElementById('btn-sync-google-calendar');
+                    if (googleBtn) googleBtn.href = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(syncUrl)}`;
+
+                    const appleBtn = document.getElementById('btn-sync-apple-calendar');
+                    if (appleBtn) appleBtn.href = syncUrl.replace(/^https?:\/\//i, 'webcal://');
                 }
 
                 syncOrgList.innerHTML = '';
