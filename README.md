@@ -1,4 +1,6 @@
-# Building Events Dashboard
+# Early Bird
+
+https://raikes-hacks-toju-cee55spem-calebjnierman-9817s-projects.vercel.app/
 
 A modern, multi-tenant web application for managing and viewing building events. It allows users to browse scheduled events grouped by organizations, manage organizations, assign roles, and sync event schedules with calendar applications.
 
